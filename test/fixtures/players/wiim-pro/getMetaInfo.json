@@ -1,0 +1,13 @@
+{
+  "metaData": {
+    "album": "FIP",
+    "title": "Clair de lune",
+    "subtitle": "",
+    "artist": "Claude Debussy",
+    "albumArtURI": "https://example.invalid/cover.jpg",
+    "sampleRate": "44100",
+    "bitDepth": "16",
+    "bitRate": "192",
+    "trackId": "s15200"
+  }
+}

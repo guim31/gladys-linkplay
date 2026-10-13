@@ -16,12 +16,13 @@ its only runtime dependency. It started from the official JavaScript template.
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/commands.test.js         # one file
+node --test --test-name-pattern "preset"  # tests whose name matches
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
 npm run format                            # Prettier, fix in place
 npx github:GladysAssistant/integration-store .   # store admission checks
+node scripts/probe.mjs 192.168.1.30 --raw  # read-only check of a real player
 ```
 
 The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
@@ -32,15 +33,23 @@ pushing.
 
 ```
 index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
+src/app.js                        registers every handler on the SDK client, returns the hub
+src/hub.js                        players, internal polling, states, orders, trigger, announcements
+src/player.js                     one player: status reads and LinkPlay orders (no Gladys)
+src/discovery.js                  mediated mDNS + SSDP, configured and known addresses, followers
+src/devices.js                    the Gladys device of a player (feature keys, frozen)
+src/linkplay/                     protocol: http.js (bounded GET, self-signed HTTPS),
+                                  client.js (addresses, HTTPS then HTTP, encoding),
+                                  status.js (answers, sources, inputs), models.js (makes)
+src/actions.js, scenes.js, widgets.js  manifest actions, scene actions, the "player" widget
+src/i18n.js                       every text in en, fr, de, es
 src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
+src/issues.js                     a repeated failure logged once
+scripts/probe.mjs                 read-only probe of real players (for whoever has the hardware)
 gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
+docs/{en,fr,de,es}.md             user documentation, same sections (re-hosted by Gladys)
+test/                             node --test, SDK fake Gladys + fake players (helpers/)
+test/fixtures/players/            real (Home Assistant) and reconstructed LinkPlay answers
 .github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
 ```
 
@@ -67,11 +76,15 @@ test/                             node --test, against the SDK's fake Gladys (in
   catalog `description` holds 10 to 100 characters per language. A field the
   older cores do not know needs a higher `gladys_version` minimum
   (`categories`: 4.86.0; `widgets`, `scene_triggers`, `scene_actions`,
-  `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
+  `type: "provider"`: 5.1.0; a widget button opening a form: 5.2.0). `test/manifest.test.js` ties the manifest to the
   code (defaults, action, scene and widget handlers): change both sides
   together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
+- **User-facing text** exists in English, French, German and Spanish (the
+  languages of Gladys): manifest texts, action messages, widget contents,
+  errors, feature and source names (`src/i18n.js`), and `docs/en.md`,
+  `fr.md`, `de.md`, `es.md` with the same sections. German says "du", Spanish
+  "usted"; `test/i18n.test.js` fails on a missing language, an empty or too
+  long text, the wrong form, or docs whose outlines differ.
 - **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
   in English. Tests never touch the network.
 
@@ -233,3 +246,70 @@ long, et sur un « Sie »/« Ihr… » de politesse en allemand. Le store exige 
 - Docs `en`, `fr`, `de`, `es` avec les mêmes sections.
 - Chauffe, ouverture, sécurité : ne rien rendre pilotable « comme un thermostat » ou par un assistant
   vocal quand une erreur serait dangereuse (leçon d'OctoPrint).
+
+## LinkPlay (cette intégration)
+
+Développée **sans le matériel** : ce qui suit vient de python-linkplay (MIT), de la bibliothèque `wiim`
+(MIT, Linkplay), des fixtures du `linkplay` de Home Assistant (vraies réponses d'un ArtSound) et de la doc
+WiiM/Arylic lue de mémoire (injoignables depuis la session). `scripts/probe.mjs` vérifie un vrai lecteur
+en lecture seule ; les points marqués **(hypothèse)** attendent ce test.
+
+**API** : `GET /httpapi.asp?command=<commande>`, HTTPS 443 d'abord (certificat auto-signé, firmwares
+récents, WiiM), puis HTTP 80 ; le point qui répond est retenu, oublié à la première panne. Réponses :
+JSON pour les lectures, `OK` (ou `{"status":"OK"}`) pour les ordres, `unknown command` pour une commande
+inconnue du firmware (alors plus redemandée : `Player.unsupported`), `Failed` quand il n'y a rien à dire
+(`getMetaInfo` à l'arrêt : redemandée plus tard).
+
+- **Identité** : `uuid` de `getStatusEx` (32 hexadécimaux, majuscules), seul `platformId`. L'adresse vit
+  dans le param `IP_ADDRESS` (republié à chaque découverte : le cœur l'actualise sans « Mettre à jour »).
+  Un lecteur ajouté qui ne répond plus relance la découverte toutes les 5 min et est retrouvé par son uuid.
+- **Lecture** : `getPlayerStatusEx`, repli sur `getPlayerStatus` (vieux firmwares). Titres en hexadécimal
+  UTF-8 la plupart du temps : décodés seulement si le résultat est de l'UTF-8 sans caractère de contrôle
+  (« ABBA », « CAFE » restent tels quels). `mode` donne la source (table `MODES` de `status.js`, 99 =
+  suiveur d'un groupe, sans source propre) ; `plm_support` les entrées (bits de python-linkplay), complété
+  pour les WiiM par la table des modèles (leur `plm_support` est incomplet). Un WiiM qui lit une radio ne
+  donne ses titres que par `getMetaInfo`.
+- **Ordres** : `setPlayerCmd:resume|pause|stop|prev|next|vol:N|mute:0/1|switchmode:<nom>|play:<url>`,
+  `MCUKeyShortClick:N` (préréglage N, `preset_key` en donne le nombre). Les noms `switchmode` sont
+  sensibles à la casse (`INPUTS`). L'URL d'un `play:` est passée telle quelle après les deux-points ; seuls
+  `&`, `#`, `+`, `%`, espaces et non-ASCII sont encodés (`encodeCommand`) **(hypothèse : le firmware
+  décode le paramètre)**.
+- **WiiM** : `EQGetList` (noms), `EQLoad:<nom>`, `EQOff`, `EQGetStat` (`On`/`Off` seulement : l'API ne dit
+  jamais quel préréglage est chargé, d'où un état inconnu après un choix dans l'app). `getPresetInfo` pour
+  les noms des préréglages **(hypothèse)**.
+- **Annonce** (`music/play_notification`, l'URL MP3 du TTS de Gladys Plus, avec un jeton : jamais
+  journalisée entière, `loggableUrl`) : `playPromptUrl:<url>` joue par-dessus la musique et la reprend
+  **(hypothèse, doc WiiM)** ; sans elle, `play:<url>` puis retour à l'entrée physique qui jouait (suivi
+  par le sondage, 2 min au plus). Un flux réseau ne peut pas être repris : l'API ne donne pas son URL.
+- **Groupes** : `multiroom:getSlaveList` sur le maître (`slaves` nombre ou chaîne), rejoindre :
+  `ConnectMasterAp:JoinGroupMaster:eth<IP du maître>:wifi0.0.0.0` sur le suiveur, quitter :
+  `multiroom:SlaveKickout:<IP>` sur le maître (ou `multiroom:LeaveGroup` si le maître est inconnu),
+  dissoudre : `multiroom:Ungroup`. Les suiveurs sont trouvés par la liste de leur maître (certains
+  firmwares ne répondent plus en SSDP une fois groupés).
+- **Audio Pro récents (port 4443)** : exigent un certificat client (mTLS). python-linkplay embarque celui
+  de LinkPlay, clé privée comprise : **non recopié** dans ce dépôt public. Non pris en charge.
+
+**Découverte** : mDNS `_linkplay._tcp` puis SSDP `MediaRenderer:1` (une seule entrée `ssdp` : le cœur ne
+scanne que la première ; un scan à la fois). Le SSDP ramène aussi téléviseurs et amplis : chacun reçoit un
+`getStatusEx` (2,5 s), et un non-LinkPlay n'est plus redemandé pendant 30 min. Les adresses configurées et
+celles des lecteurs ajoutés sont toujours redemandées.
+
+**Sondage** (#3198) : `should_poll: false`, minuteur interne (`hub.js`) : 5 s en lecture, 30 s sinon,
+1 min injoignable (dit perdu après 2 échecs : une ligne info, une au retour), 0,7 s puis 2 s ×2 après un
+ordre ; groupe et égaliseur toutes les 30 s, `getStatusEx` toutes les 10 min. `onPoll` en repli.
+Heartbeat 6 h par `publishChangedStates`. Seuls les lecteurs ajoutés sont sondés.
+
+**Pièges vus en écrivant l'intégration**
+
+- Le déclencheur d'état d'appareil du front (`DeviceFeatureState.jsx`, 5.2.1) ne sait rien faire d'un
+  `text/select` : un changement de source passe donc par le déclencheur d'intégration `source_changed`,
+  qui n'est pas émis pour une source commandée depuis Gladys (pas de boucle) ni pendant une annonce.
+- Le front nomme une ligne de fonctionnalité par le nom de l'appareil quand **son type** est unique sur
+  l'appareil (`shouldDisplayDeviceName` compare le seul `type`, pas la catégorie). Titre/Artiste/Album/
+  Groupe (4 `text`) et Source/Égaliseur (2 `select`, WiiM) gardent leur nom ; la Source seule d'un
+  non-WiiM s'affiche sous le nom du lecteur.
+- Onglets d'une intégration externe : « Discover » / « Découverte » / « Entdecken » / « Descubrir ».
+- Faux Gladys du SDK : l'ack d'une action est `{ data: { message } }`, d'une action de scène
+  `{ data: { outputs } }`, d'un bouton de widget `{ data: { message } }`.
+- Formulaire d'un bouton de widget (5.2.0) : `label` des champs et des options en objets multilingues
+  (`en` exigé), 40 caractères au plus.

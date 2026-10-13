@@ -1,67 +1,196 @@
-# Template de démonstration
+# LinkPlay (WiiM, Arylic…)
 
-Ceci est la documentation utilisateur de l'intégration. Gladys ré-héberge ce
-fichier et affiche un lien **Documentation** permanent vers lui dans l'écran
-de configuration (dans la langue de l'utilisateur, avec l'anglais en repli) —
-c'est au moment de configurer que l'utilisateur en a le plus besoin. Gardez
-les courtes indications d'accueil dans les blocs `section` du `config_schema`
-du manifest ; mettez ici le pas-à-pas détaillé (captures d'écran, dépannage…).
+Pilotez depuis Gladys vos streamers et enceintes basés sur la plateforme
+LinkPlay — **WiiM**, **Arylic**, **Audio Pro**, iEAST, ArtSound et d'autres —
+**100 % en local** : lecture, volume, sources, préréglages, groupes multiroom,
+annonces.
 
-## Ce que vous obtenez
+> Cette intégration n'est affiliée ni à LinkPlay, WiiM, Arylic ni à Audio Pro.
+> **Développée sans le matériel : vos retours sont les bienvenus.** Elle suit
+> l'API HTTP commune à ces lecteurs et les réponses de vrais lecteurs publiées
+> par le projet Home Assistant ; dites-nous ce qui marche ou non sur votre
+> modèle.
 
-Six appareils de démonstration apparaissent après l'installation : une
-station météo (vraies données Open-Meteo), un interrupteur, une lampe
-variable, une prise connectée avec mesure de puissance, un détecteur de
-mouvement et une caméra.
+## Présentation
+
+L'intégration parle à chaque lecteur par son API HTTP locale (`/httpapi.asp`),
+la même sur tous les micrologiciels LinkPlay. Ni compte ni cloud.
+
+Lecteurs connus : WiiM Mini, Pro, Pro Plus, Amp, Amp Pro, Amp Ultra, Ultra ;
+Arylic Up2Stream (Amp, Pro, Mini, Plate Amp), S10+, S50+, S50 Pro, A30, A50,
+A50+ ; Audio Pro C3, C10, A10 (première génération) ; iEAST AudioCast M5 ;
+ArtSound Smart Zone 4, Smart Hyde ; GGMM E2 ; modèles Medion, August, Triangle
+et Muzo. Les autres lecteurs LinkPlay marchent en général aussi, sous un nom
+générique.
+
+**LinkPlay ou DLNA ?** L'intégration DLNA joue des médias sur tout lecteur
+UPnP, lecteurs LinkPlay compris. LinkPlay est le pilotage complet de ces
+lecteurs : entrées (TV, optique, Bluetooth...), préréglages, groupes multiroom,
+égaliseur WiiM, annonces par-dessus la musique. Choisissez l'une des deux pour
+un lecteur donné, pour ne pas l'avoir deux fois dans Gladys.
+
+## Prérequis
+
+- Gladys 5.2.0 ou plus récent.
+- Les lecteurs sur le réseau de Gladys, déjà installés avec leur application
+  (WiiM Home, 4STREAM, Audio Pro...).
+- Pour la découverte automatique, Gladys et les lecteurs sur le même réseau
+  (mDNS et SSDP ne traversent pas les routeurs). Sinon, donnez leurs adresses.
 
 ## Configuration
 
-1. Ouvrez l'onglet **Configuration** de l'intégration.
-2. Renseignez la **latitude** et la **longitude** que la station météo de
-   démonstration doit observer (Paris par défaut), et choisissez votre unité
-   de température. L'**intervalle de rafraîchissement** règle la fréquence
-   de lecture de la station météo et de la puissance de la prise : toutes
-   les 5 minutes par défaut, toutes les minutes au plus.
-3. Enregistrez : les appareils apparaissent dans l'onglet **Découverte**,
-   prêts à être ajoutés.
+### Trouver les lecteurs
 
-Le réglage **Préférer la connexion locale** pilote la prise de
-démonstration : elle affiche en badge le canal réellement utilisé (local ou
-cloud), avec un point orange quand elle fonctionne en mode dégradé (local
-refusé, bascule cloud).
+Ouvrez l'onglet **Découverte** de l'intégration : les lecteurs trouvés par
+Gladys (mDNS `_linkplay._tcp` et SSDP) y apparaissent ; ajoutez ceux que vous
+voulez. Un lecteur qui suit un groupe multiroom est trouvé par le maître du
+groupe.
 
-## Actions
+### Champs de configuration
 
-- **Tester le fournisseur météo** — effectue une requête en direct vers
-  Open-Meteo et affiche la température et l'humidité actuelles sous le
-  bouton.
-- **Identifier un appareil** — choisissez un de vos appareils dans la liste
-  et il se signale (la lampe de démonstration « clignote » dans les logs).
+| Champ                       | Usage                                                                                                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Adresses des lecteurs       | Facultatif. Adresses IP ou noms d'hôte, séparés par des virgules, pour les lecteurs que la découverte ne voit pas (autre réseau, VLAN). `http://` ou un port se précisent quand un lecteur l'exige. |
+| Langue des noms et messages | Noms des fonctionnalités des lecteurs ajoutés à partir de maintenant (Gladys les garde une fois le lecteur ajouté), noms des sources, messages des commandes et des scènes. Français par défaut.    |
 
-## Scènes
+### Actions
 
-L'intégration ajoute ses propres cartes à l'éditeur de scènes (Gladys 5.1
-ou plus récent), dans la catégorie **Intégrations** :
+- **Rechercher les lecteurs** : cherche maintenant, met à jour l'onglet
+  Découverte et liste ce qui a répondu, les adresses configurées restées
+  muettes et les entrées ignorées.
+- **Tester une adresse** : interroge une adresse et montre le modèle, le
+  micrologiciel, la façon dont il répond (HTTPS ou HTTP) et ses sources.
 
-- **Mouvement détecté** (déclencheur) — lance la scène quand un détecteur
-  de démonstration voit bouger quelque chose. Choisissez éventuellement le
-  détecteur et ce qui a bougé (personne, animal) ; laissés vides, toute
-  détection correspond. Les actions suivantes peuvent lire ce qui a bougé
-  avec `{{triggerEvent.data.target}}`.
-- **Identifier un appareil** (action) — fait se signaler l'appareil choisi.
-  Elle indique si l'appareil a pu se signaler, pour que les actions
-  suivantes puissent en dépendre.
+## Ce que fait chaque lecteur
 
-## Tableau de bord
+Chaque lecteur est un appareil Gladys, nommé comme dans son application.
 
-Ajoutez le widget **État de la démo** à un tableau de bord : il affiche en
-direct la température de la station météo et la puissance de la prise du
-bureau, la connexion utilisée par la prise (en orange si dégradée) et la
-position observée. Son bouton **Identifier la lampe** fait se signaler la
-lampe de démonstration.
+### Lecture et volume
+
+| Fonctionnalité     | Type                     | Ce qu'elle fait                                         |
+| ------------------ | ------------------------ | ------------------------------------------------------- |
+| Lecture            | music / play             | Reprend la lecture                                      |
+| Pause              | music / pause            | Met en pause                                            |
+| Stop               | television / stop        | Arrête (un bouton dans la carte de la pièce)            |
+| Précédent, Suivant | music / previous, next   | Piste précédente ou suivante                            |
+| Volume             | music / volume (0-100)   | Lit et règle le volume                                  |
+| Sourdine           | television / volume-mute | Coupe le son, ou le remet s'il est coupé (un bouton)    |
+| État de lecture    | music / playback_state   | 1 pendant la lecture, 0 sinon (gardé dans l'historique) |
+
+Le widget Musique du tableau de bord de Gladys utilise ces fonctionnalités.
+
+### Source et égaliseur
+
+- **Source** (une liste) : les entrées de ce lecteur — réseau (Wi-Fi),
+  Bluetooth, entrée ligne, optique, coaxial, HDMI / ARC, phono, USB... En
+  choisir une y bascule le lecteur. Un lecteur qui suit un groupe n'a pas de
+  source propre.
+- **Égaliseur** (WiiM seulement) : les préréglages d'égaliseur du WiiM (Flat,
+  Rock, Jazz...) ou « Désactivé ». L'API WiiM dit si l'égaliseur est actif,
+  pas lequel : celui choisi dans l'application WiiM Home reste inconnu tant que
+  vous ne le choisissez pas dans Gladys.
+
+### Titres et groupe
+
+- **Titre**, **Artiste**, **Album** : ce qui joue ; « — » quand la source ne
+  dit rien (une entrée, un lecteur qui suit un groupe).
+- **Groupe multiroom** : « Non groupé », « Maître de : Cuisine, Chambre » ou
+  « Suit : Salon ».
+
+### Parler sur une enceinte
+
+L'action **Parler sur une enceinte** des scènes de Gladys parle sur le
+lecteur. Sur un WiiM, l'annonce passe par-dessus la musique, qui reprend
+ensuite. Sur un micrologiciel sans cette commande, l'annonce remplace la
+musique : si une entrée (TV, ligne...) jouait, le lecteur y revient ensuite ;
+un flux réseau (Spotify, une radio web) ne repart pas — relancez-le par un
+préréglage dans l'action suivante de la scène. Gladys ne transmet pas le
+volume de l'action à l'intégration.
+
+## Widget
+
+Le widget **LinkPlay** (tableau de bord → ajouter une boîte → LinkPlay, puis
+choisir le lecteur) montre le titre, l'artiste et l'album, le volume en
+direct, la source, l'état et le groupe, et quatre boutons : **Précédent**,
+**Lecture / Pause**, **Suivant** et **Préréglages**, qui ouvre la liste des
+préréglages (avec leur nom sur un WiiM) et joue celui choisi.
+
+## Déclencheur de scène
+
+**Source LinkPlay changée** : un lecteur est passé sur une autre entrée.
+Filtres : le lecteur (vide : n'importe lequel) et les nouvelles sources
+(vide : toutes). Variables : lecteur, nouvelle source (son nom, et sa clé),
+source précédente (clé).
+
+Il ne se déclenche pas pour une source choisie depuis Gladys (une scène
+pourrait boucler dessus), ni pendant une annonce.
+
+## Actions de scène
+
+| Action                         | Champs                                             | Résultat                 |
+| ------------------------------ | -------------------------------------------------- | ------------------------ |
+| Jouer un préréglage LinkPlay   | Lecteur, numéro du préréglage, volume (facultatif) | Nom du préréglage (WiiM) |
+| Jouer une adresse sur LinkPlay | Lecteur, adresse http(s), volume (facultatif)      | —                        |
+| Grouper des lecteurs LinkPlay  | Lecteur qui rejoint, maître du groupe              | —                        |
+| Dégrouper un lecteur LinkPlay  | Lecteur                                            | —                        |
+
+Les préréglages sont ceux enregistrés dans l'application du lecteur (6 à 12
+selon le modèle). Dégrouper un maître de groupe dissout tout son groupe.
+
+## Exemples de scènes
+
+- **Soirée film** : déclencheur « Source LinkPlay changée », lecteur
+  « Salon », source « HDMI ARC » → baisser les lumières du salon.
+- **Réveil** : chaque jour de semaine à 7 h → « Jouer un préréglage
+  LinkPlay » sur « Cuisine », préréglage 1, volume 20, puis « Grouper des
+  lecteurs LinkPlay » : « Salle de bain » rejoint « Cuisine ».
+- **Sonnette** : on sonne → « Parler sur une enceinte » sur « Salon » :
+  « Quelqu'un est à la porte ».
+- **Départ** : la maison est vide → « Dégrouper » puis arrêter chaque lecteur.
+
+## Rafraîchissement et trafic réseau
+
+L'intégration interroge elle-même les lecteurs ajoutés à Gladys : toutes les
+5 secondes pendant la lecture, toutes les 30 secondes sinon, chaque minute
+tant qu'un lecteur ne répond pas, et juste après un ordre. Une interrogation
+fait une ou deux requêtes sur le réseau local ; le groupe et l'égaliseur sont
+lus toutes les 30 secondes, les détails du lecteur toutes les 10 minutes. Les
+lecteurs n'ont pas de quota ; rien ne sort de votre réseau.
+
+Seules les valeurs qui changent partent vers Gladys (et toutes les 6 heures
+quand même, pour que Gladys ne les montre jamais comme anciennes). Le réseau
+est fouillé au démarrage, par **Rechercher les lecteurs**, et toutes les
+5 minutes tant qu'un lecteur ajouté manque (une nouvelle adresse après un
+redémarrage de la box est retrouvée toute seule).
 
 ## Dépannage
 
-L'intégration journalise tout ce qu'elle fait : consultez les logs de
-l'intégration depuis l'interface Gladys (ou `docker logs` sur l'hôte) avec
-`LOG_LEVEL=debug` pour le détail complet.
+- **Un lecteur n'est pas trouvé** : il est sur un autre réseau, ou mDNS /
+  SSDP n'atteignent pas Gladys. Utilisez **Tester une adresse**, puis ajoutez
+  son adresse dans la configuration.
+- **« ne répond pas »** : vérifiez que le lecteur est allumé et sur le
+  réseau. L'intégration essaie HTTPS (port 443, le certificat auto-signé du
+  lecteur est accepté), puis HTTP (port 80).
+- **Une source manque dans la liste** : le lecteur ne la déclare pas ;
+  donnez-nous son modèle.
+- **Les titres affichent « — »** : la source ne donne pas de titre (une
+  entrée, certains services).
+- **Plus de détails** : passez la variable `LOG_LEVEL` à `debug` sur
+  l'intégration ; les journaux ne montrent jamais l'adresse d'une annonce en
+  entier.
+
+## Limites
+
+- Développée sans le matériel : les commandes viennent de l'API LinkPlay
+  commune et de réponses publiques de vrais lecteurs, pas d'un essai sur
+  chaque modèle.
+- Les lecteurs Audio Pro récents qui ne répondent que sur le port 4443 avec
+  un certificat client ne sont pas encore pris en charge.
+- Les noms des préréglages ne viennent que des WiiM ; ailleurs, les
+  préréglages sont numérotés.
+- Ni avance rapide, ni aléatoire, ni répétition, ni navigation dans une
+  bibliothèque musicale : l'intégration DLNA le fait.
+- Un lecteur qui suit un groupe n'affiche pas de titre ; le volume d'un
+  groupe entier n'est pas géré (chaque lecteur garde le sien).
+- L'état de l'égaliseur est inconnu quand il est changé depuis l'application
+  WiiM Home.
