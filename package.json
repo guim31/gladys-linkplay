@@ -1,8 +1,8 @@
 {
-  "name": "gladys-integration-template-js",
+  "name": "gladys-linkplay",
   "version": "1.0.0",
   "private": true,
-  "description": "Official starter template to build an external integration for Gladys Assistant with the JavaScript SDK.",
+  "description": "LinkPlay integration for Gladys Assistant: WiiM, Arylic, Audio Pro and other LinkPlay streamers, sources, presets, multiroom groups, 100% local.",
   "type": "module",
   "main": "index.js",
   "scripts": {

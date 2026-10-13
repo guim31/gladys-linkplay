@@ -1,101 +1,162 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "LinkPlay (WiiM, Arylic…)",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Control WiiM, Arylic, Audio Pro and other LinkPlay players: sources, presets, groups. Local.",
+    "fr": "Pilotez WiiM, Arylic, Audio Pro et autres lecteurs LinkPlay : sources, préréglages, groupes. Local.",
+    "de": "Steuere WiiM, Arylic, Audio Pro und andere LinkPlay-Player: Quellen, Presets, Gruppen. Lokal.",
+    "es": "Controle WiiM, Arylic, Audio Pro y otros reproductores LinkPlay: fuentes, preajustes, grupos. Local."
   },
   "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
-  "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "docker_image": "ghcr.io/guim31/gladys-linkplay:1.0.0",
+  "gladys_version": ">=5.2.0",
+  "cover_image": "https://raw.githubusercontent.com/guim31/gladys-linkplay/main/cover.png",
+  "categories": ["multimedia"],
+  "transports": ["local"],
+  "network_discovery": [
+    {
+      "type": "mdns",
+      "service": "_linkplay._tcp"
+    },
+    {
+      "type": "ssdp",
+      "st": "urn:schemas-upnp-org:device:MediaRenderer:1"
+    }
+  ],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
-      "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+      "label": {
+        "en": "Finding your players",
+        "fr": "Trouver vos lecteurs",
+        "de": "Deine Player finden",
+        "es": "Encontrar sus reproductores"
       },
-      "links": [
+      "description": {
+        "en": "The LinkPlay players of your network (WiiM, Arylic, Audio Pro, iEAST...) are found automatically: open the Discover tab and add the ones you want. A player on another network (VLAN, other subnet) can be added by its address below.",
+        "fr": "Les lecteurs LinkPlay de votre réseau (WiiM, Arylic, Audio Pro, iEAST...) sont trouvés automatiquement : ouvrez l'onglet Découverte et ajoutez ceux que vous voulez. Un lecteur sur un autre réseau (VLAN, autre sous-réseau) s'ajoute par son adresse ci-dessous.",
+        "de": "Die LinkPlay-Player in deinem Netzwerk (WiiM, Arylic, Audio Pro, iEAST...) werden automatisch gefunden: Öffne den Tab Entdecken und füge die gewünschten hinzu. Einen Player in einem anderen Netz (VLAN, anderes Subnetz) fügst du unten über seine Adresse hinzu.",
+        "es": "Los reproductores LinkPlay de su red (WiiM, Arylic, Audio Pro, iEAST...) se encuentran automáticamente: abra la pestaña Descubrir y añada los que desee. Un reproductor en otra red (VLAN, otra subred) se añade por su dirección más abajo."
+      }
+    },
+    {
+      "key": "hosts",
+      "type": "string",
+      "label": {
+        "en": "Player addresses (optional)",
+        "fr": "Adresses des lecteurs (facultatif)",
+        "de": "Player-Adressen (optional)",
+        "es": "Direcciones de los reproductores (opcional)"
+      },
+      "description": {
+        "en": "One or several IP addresses or host names, separated by commas. Use the \"Test an address\" action to check one first.",
+        "fr": "Une ou plusieurs adresses IP ou noms d'hôte, séparés par des virgules. L'action « Tester une adresse » en vérifie une d'abord.",
+        "de": "Eine oder mehrere IP-Adressen oder Hostnamen, durch Kommas getrennt. Mit der Aktion „Adresse testen“ prüfst du zuerst eine.",
+        "es": "Una o varias direcciones IP o nombres de host, separados por comas. La acción «Probar una dirección» comprueba una primero."
+      },
+      "placeholder": {
+        "en": "192.168.1.30, 192.168.1.31",
+        "fr": "192.168.1.30, 192.168.1.31",
+        "de": "192.168.1.30, 192.168.1.31",
+        "es": "192.168.1.30, 192.168.1.31"
+      },
+      "required": false
+    },
+    {
+      "key": "language",
+      "type": "select",
+      "label": {
+        "en": "Language of names and messages",
+        "fr": "Langue des noms et messages",
+        "de": "Sprache der Namen und Meldungen",
+        "es": "Idioma de los nombres y mensajes"
+      },
+      "description": {
+        "en": "Names of the features of the players added from now on (Gladys keeps them once a player is added), source names, and messages of commands and scenes.",
+        "fr": "Noms des fonctionnalités des lecteurs ajoutés à partir de maintenant (Gladys les garde une fois le lecteur ajouté), noms des sources et messages des commandes et des scènes.",
+        "de": "Namen der Funktionen der ab jetzt hinzugefügten Player (Gladys behält sie, sobald ein Player hinzugefügt ist), Namen der Quellen und Meldungen von Befehlen und Szenen.",
+        "es": "Nombres de las funciones de los reproductores añadidos a partir de ahora (Gladys los conserva una vez añadido el reproductor), nombres de las fuentes y mensajes de comandos y escenas."
+      },
+      "required": false,
+      "default": "fr",
+      "options": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "value": "en",
+          "label": {
+            "en": "English",
+            "fr": "Anglais",
+            "de": "Englisch",
+            "es": "Inglés"
+          }
+        },
+        {
+          "value": "fr",
+          "label": {
+            "en": "French",
+            "fr": "Français",
+            "de": "Französisch",
+            "es": "Francés"
+          }
+        },
+        {
+          "value": "de",
+          "label": {
+            "en": "German",
+            "fr": "Allemand",
+            "de": "Deutsch",
+            "es": "Alemán"
+          }
+        },
+        {
+          "value": "es",
+          "label": {
+            "en": "Spanish",
+            "fr": "Espagnol",
+            "de": "Spanisch",
+            "es": "Español"
+          }
         }
       ]
-    },
-    {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
-      "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
-    },
-    {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
-      "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
-      "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
-      },
-      "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "search",
+      "label": {
+        "en": "Search for players",
+        "fr": "Rechercher les lecteurs",
+        "de": "Player suchen",
+        "es": "Buscar reproductores"
+      },
+      "timeout_seconds": 60
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "test_address",
+      "label": {
+        "en": "Test an address",
+        "fr": "Tester une adresse",
+        "de": "Adresse testen",
+        "es": "Probar una dirección"
+      },
+      "timeout_seconds": 20,
       "fields": [
         {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "key": "address",
+          "type": "string",
+          "label": {
+            "en": "Player address",
+            "fr": "Adresse du lecteur",
+            "de": "Player-Adresse",
+            "es": "Dirección del reproductor"
+          },
+          "placeholder": {
+            "en": "192.168.1.30",
+            "fr": "192.168.1.30",
+            "de": "192.168.1.30",
+            "es": "192.168.1.30"
+          },
           "required": true
         }
       ]
@@ -103,74 +164,498 @@
   ],
   "scene_triggers": [
     {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "source_changed",
+      "label": {
+        "en": "LinkPlay source changed",
+        "fr": "Source LinkPlay changée",
+        "de": "LinkPlay-Quelle gewechselt",
+        "es": "Fuente LinkPlay cambiada"
+      },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
+        "en": "A player switched to another input: TV (HDMI, optical), Bluetooth, line in...",
+        "fr": "Un lecteur est passé sur une autre entrée : TV (HDMI, optique), Bluetooth, ligne...",
+        "de": "Ein Player hat den Eingang gewechselt: TV (HDMI, optisch), Bluetooth, Line-In...",
+        "es": "Un reproductor ha cambiado de entrada: TV (HDMI, óptica), Bluetooth, línea..."
       },
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
+          "label": {
+            "en": "Player (empty: any)",
+            "fr": "Lecteur (vide : n'importe lequel)",
+            "de": "Player (leer: beliebig)",
+            "es": "Reproductor (vacío: cualquiera)"
+          }
         },
         {
-          "key": "target",
+          "key": "source",
           "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
+          "label": {
+            "en": "New source (empty: any)",
+            "fr": "Nouvelle source (vide : toutes)",
+            "de": "Neue Quelle (leer: beliebig)",
+            "es": "Nueva fuente (vacío: cualquiera)"
+          },
           "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
+            {
+              "value": "wifi",
+              "label": {
+                "en": "Network (Wi-Fi)",
+                "fr": "Réseau (Wi-Fi)",
+                "de": "Netzwerk (WLAN)",
+                "es": "Red (Wi-Fi)"
+              }
+            },
+            {
+              "value": "bluetooth",
+              "label": {
+                "en": "Bluetooth",
+                "fr": "Bluetooth",
+                "de": "Bluetooth",
+                "es": "Bluetooth"
+              }
+            },
+            {
+              "value": "line-in",
+              "label": {
+                "en": "Line in",
+                "fr": "Entrée ligne",
+                "de": "Line-Eingang",
+                "es": "Entrada de línea"
+              }
+            },
+            {
+              "value": "line-in-2",
+              "label": {
+                "en": "Line in 2",
+                "fr": "Entrée ligne 2",
+                "de": "Line-Eingang 2",
+                "es": "Entrada de línea 2"
+              }
+            },
+            {
+              "value": "optical",
+              "label": {
+                "en": "Optical",
+                "fr": "Optique",
+                "de": "Optisch",
+                "es": "Óptica"
+              }
+            },
+            {
+              "value": "optical-2",
+              "label": {
+                "en": "Optical 2",
+                "fr": "Optique 2",
+                "de": "Optisch 2",
+                "es": "Óptica 2"
+              }
+            },
+            {
+              "value": "coaxial",
+              "label": {
+                "en": "Coaxial",
+                "fr": "Coaxial",
+                "de": "Koaxial",
+                "es": "Coaxial"
+              }
+            },
+            {
+              "value": "coaxial-2",
+              "label": {
+                "en": "Coaxial 2",
+                "fr": "Coaxial 2",
+                "de": "Koaxial 2",
+                "es": "Coaxial 2"
+              }
+            },
+            {
+              "value": "rca",
+              "label": {
+                "en": "RCA",
+                "fr": "RCA",
+                "de": "RCA",
+                "es": "RCA"
+              }
+            },
+            {
+              "value": "xlr",
+              "label": {
+                "en": "XLR",
+                "fr": "XLR",
+                "de": "XLR",
+                "es": "XLR"
+              }
+            },
+            {
+              "value": "hdmi",
+              "label": {
+                "en": "HDMI",
+                "fr": "HDMI",
+                "de": "HDMI",
+                "es": "HDMI"
+              }
+            },
+            {
+              "value": "arc",
+              "label": {
+                "en": "HDMI ARC",
+                "fr": "HDMI ARC",
+                "de": "HDMI ARC",
+                "es": "HDMI ARC"
+              }
+            },
+            {
+              "value": "phono",
+              "label": {
+                "en": "Phono",
+                "fr": "Phono",
+                "de": "Phono",
+                "es": "Phono"
+              }
+            },
+            {
+              "value": "usb",
+              "label": {
+                "en": "USB",
+                "fr": "USB",
+                "de": "USB",
+                "es": "USB"
+              }
+            },
+            {
+              "value": "usb-dac",
+              "label": {
+                "en": "USB DAC",
+                "fr": "DAC USB",
+                "de": "USB-DAC",
+                "es": "DAC USB"
+              }
+            },
+            {
+              "value": "sd-card",
+              "label": {
+                "en": "SD card",
+                "fr": "Carte SD",
+                "de": "SD-Karte",
+                "es": "Tarjeta SD"
+              }
+            },
+            {
+              "value": "cd",
+              "label": {
+                "en": "CD",
+                "fr": "CD",
+                "de": "CD",
+                "es": "CD"
+              }
+            },
+            {
+              "value": "fm",
+              "label": {
+                "en": "FM",
+                "fr": "FM",
+                "de": "FM",
+                "es": "FM"
+              }
+            },
+            {
+              "value": "dab",
+              "label": {
+                "en": "DAB",
+                "fr": "DAB",
+                "de": "DAB",
+                "es": "DAB"
+              }
+            },
+            {
+              "value": "external-bluetooth",
+              "label": {
+                "en": "External Bluetooth",
+                "fr": "Bluetooth externe",
+                "de": "Externes Bluetooth",
+                "es": "Bluetooth externo"
+              }
+            }
           ]
         }
       ],
       "variables": [
         {
-          "key": "target",
+          "key": "player",
           "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
+          "label": {
+            "en": "Player",
+            "fr": "Lecteur",
+            "de": "Player",
+            "es": "Reproductor"
+          }
+        },
+        {
+          "key": "source_name",
+          "type": "string",
+          "label": {
+            "en": "New source",
+            "fr": "Nouvelle source",
+            "de": "Neue Quelle",
+            "es": "Nueva fuente"
+          }
+        },
+        {
+          "key": "source",
+          "type": "string",
+          "label": {
+            "en": "New source (key)",
+            "fr": "Nouvelle source (clé)",
+            "de": "Neue Quelle (Schlüssel)",
+            "es": "Nueva fuente (clave)"
+          }
+        },
+        {
+          "key": "previous_source",
+          "type": "string",
+          "label": {
+            "en": "Previous source (key)",
+            "fr": "Source précédente (clé)",
+            "de": "Vorherige Quelle (Schlüssel)",
+            "es": "Fuente anterior (clave)"
+          }
         }
       ]
     }
   ],
   "scene_actions": [
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
+      "key": "play_preset",
+      "label": {
+        "en": "Play a LinkPlay preset",
+        "fr": "Jouer un préréglage LinkPlay",
+        "de": "LinkPlay-Voreinstellung abspielen",
+        "es": "Reproducir un preajuste LinkPlay"
       },
-      "timeout_seconds": 15,
+      "description": {
+        "en": "Start one of the presets saved in the player's app (WiiM Home, 4STREAM...).",
+        "fr": "Lance un des préréglages enregistrés dans l'application du lecteur (WiiM Home, 4STREAM...).",
+        "de": "Startet eine der in der App des Players gespeicherten Voreinstellungen (WiiM Home, 4STREAM...).",
+        "es": "Inicia uno de los preajustes guardados en la aplicación del reproductor (WiiM Home, 4STREAM...)."
+      },
+      "timeout_seconds": 20,
       "fields": [
         {
           "key": "device",
           "type": "select",
           "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
+          "label": {
+            "en": "Player",
+            "fr": "Lecteur",
+            "de": "Player",
+            "es": "Reproductor"
+          },
           "required": true
+        },
+        {
+          "key": "preset",
+          "type": "number",
+          "label": {
+            "en": "Preset number",
+            "fr": "Numéro du préréglage",
+            "de": "Nummer der Voreinstellung",
+            "es": "Número del preajuste"
+          },
+          "required": true,
+          "min": 1,
+          "max": 20
+        },
+        {
+          "key": "volume",
+          "type": "number",
+          "label": {
+            "en": "Volume (optional, 0-100)",
+            "fr": "Volume (facultatif, 0-100)",
+            "de": "Lautstärke (optional, 0-100)",
+            "es": "Volumen (opcional, 0-100)"
+          },
+          "min": 0,
+          "max": 100
         }
       ],
       "outputs": [
         {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
+          "key": "preset_name",
+          "type": "string",
+          "label": {
+            "en": "Preset name",
+            "fr": "Nom du préréglage",
+            "de": "Name der Voreinstellung",
+            "es": "Nombre del preajuste"
+          }
+        }
+      ]
+    },
+    {
+      "key": "play_url",
+      "label": {
+        "en": "Play an address on LinkPlay",
+        "fr": "Jouer une adresse sur LinkPlay",
+        "de": "Adresse auf LinkPlay abspielen",
+        "es": "Reproducir una dirección en LinkPlay"
+      },
+      "description": {
+        "en": "A web radio or a sound file, by its http(s) address.",
+        "fr": "Une radio web ou un fichier son, par son adresse http(s).",
+        "de": "Ein Webradio oder eine Audiodatei, über ihre http(s)-Adresse.",
+        "es": "Una radio web o un archivo de sonido, por su dirección http(s)."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Player",
+            "fr": "Lecteur",
+            "de": "Player",
+            "es": "Reproductor"
+          },
+          "required": true
+        },
+        {
+          "key": "url",
+          "type": "string",
+          "label": {
+            "en": "Address (http or https)",
+            "fr": "Adresse (http ou https)",
+            "de": "Adresse (http oder https)",
+            "es": "Dirección (http o https)"
+          },
+          "placeholder": {
+            "en": "https://icecast.radiofrance.fr/fip-hifi.aac",
+            "fr": "https://icecast.radiofrance.fr/fip-hifi.aac",
+            "de": "https://icecast.radiofrance.fr/fip-hifi.aac",
+            "es": "https://icecast.radiofrance.fr/fip-hifi.aac"
+          },
+          "required": true
+        },
+        {
+          "key": "volume",
+          "type": "number",
+          "label": {
+            "en": "Volume (optional, 0-100)",
+            "fr": "Volume (facultatif, 0-100)",
+            "de": "Lautstärke (optional, 0-100)",
+            "es": "Volumen (opcional, 0-100)"
+          },
+          "min": 0,
+          "max": 100
+        }
+      ]
+    },
+    {
+      "key": "join_group",
+      "label": {
+        "en": "Group LinkPlay players",
+        "fr": "Grouper des lecteurs LinkPlay",
+        "de": "LinkPlay-Player gruppieren",
+        "es": "Agrupar reproductores LinkPlay"
+      },
+      "description": {
+        "en": "A player joins the multiroom group of another one, which leads it and plays the same music.",
+        "fr": "Un lecteur rejoint le groupe multiroom d'un autre, qui le mène et joue la même musique.",
+        "de": "Ein Player tritt der Multiroom-Gruppe eines anderen bei, der sie führt und dieselbe Musik spielt.",
+        "es": "Un reproductor se une al grupo multiroom de otro, que lo dirige y reproduce la misma música."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Player that joins",
+            "fr": "Lecteur qui rejoint",
+            "de": "Beitretender Player",
+            "es": "Reproductor que se une"
+          },
+          "required": true
+        },
+        {
+          "key": "leader",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Group leader",
+            "fr": "Maître du groupe",
+            "de": "Gruppenleiter",
+            "es": "Líder del grupo"
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "key": "leave_group",
+      "label": {
+        "en": "Ungroup a LinkPlay player",
+        "fr": "Dégrouper un lecteur LinkPlay",
+        "de": "LinkPlay-Player aus Gruppe lösen",
+        "es": "Desagrupar un reproductor LinkPlay"
+      },
+      "description": {
+        "en": "The player leaves its multiroom group; a group leader dissolves its whole group.",
+        "fr": "Le lecteur quitte son groupe multiroom ; un maître de groupe dissout tout son groupe.",
+        "de": "Der Player verlässt seine Multiroom-Gruppe; ein Gruppenleiter löst seine ganze Gruppe auf.",
+        "es": "El reproductor sale de su grupo multiroom; un líder de grupo disuelve todo su grupo."
+      },
+      "timeout_seconds": 20,
+      "fields": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Player",
+            "fr": "Lecteur",
+            "de": "Player",
+            "es": "Reproductor"
+          },
+          "required": true
         }
       ]
     }
   ],
   "widgets": [
     {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
+      "key": "player",
+      "label": {
+        "en": "LinkPlay",
+        "fr": "LinkPlay",
+        "de": "LinkPlay",
+        "es": "LinkPlay"
       },
-      "icon": "activity",
+      "description": {
+        "en": "What a LinkPlay player plays, its source and volume, play, pause and presets.",
+        "fr": "Ce que joue un lecteur LinkPlay, sa source et son volume, lecture, pause et préréglages.",
+        "de": "Was ein LinkPlay-Player spielt, Quelle und Lautstärke, Wiedergabe, Pause, Voreinstellungen.",
+        "es": "Lo que reproduce un reproductor LinkPlay, su fuente y volumen, reproducción, pausa, preajustes."
+      },
+      "icon": "speaker",
+      "settings": [
+        {
+          "key": "device",
+          "type": "select",
+          "source": "devices",
+          "label": {
+            "en": "Player",
+            "fr": "Lecteur",
+            "de": "Player",
+            "es": "Reproductor"
+          },
+          "required": true
+        }
+      ],
       "action_timeout_seconds": 15
     }
   ]

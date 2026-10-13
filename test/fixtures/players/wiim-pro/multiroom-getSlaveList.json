@@ -1,0 +1,18 @@
+{
+  "slaves": 1,
+  "wmrm_version": "4.2",
+  "slave_list": [
+    {
+      "name": "Cuisine",
+      "uuid": "FF98F359A1B2C3D4E5F60718293A4B5C",
+      "ip": "192.0.2.11",
+      "version": "4.2",
+      "type": "WiiM_AMP",
+      "channel": 0,
+      "volume": 30,
+      "mute": 0,
+      "battery_percent": 0,
+      "battery_charging": 0
+    }
+  ]
+}

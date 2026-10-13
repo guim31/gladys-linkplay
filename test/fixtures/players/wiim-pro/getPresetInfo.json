@@ -1,0 +1,26 @@
+{
+  "preset_num": 3,
+  "preset_list": [
+    {
+      "number": 1,
+      "name": "FIP",
+      "url": "unknow",
+      "source": "Tunein",
+      "picurl": "https://example.invalid/fip.png"
+    },
+    {
+      "number": 2,
+      "name": "Radio Paradise",
+      "url": "unknow",
+      "source": "Tunein",
+      "picurl": ""
+    },
+    {
+      "number": 3,
+      "name": "Discover Weekly",
+      "url": "unknow",
+      "source": "Spotify",
+      "picurl": ""
+    }
+  ]
+}

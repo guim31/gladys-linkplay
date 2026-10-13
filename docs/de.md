@@ -1,0 +1,196 @@
+# LinkPlay (WiiM, Arylic…)
+
+Steuere deine Streamer und Lautsprecher auf Basis der LinkPlay-Plattform —
+**WiiM**, **Arylic**, **Audio Pro**, iEAST, ArtSound und andere — aus Gladys,
+**100 % lokal**: Wiedergabe, Lautstärke, Quellen, Voreinstellungen,
+Multiroom-Gruppen, Durchsagen.
+
+> Diese Integration ist nicht mit LinkPlay, WiiM, Arylic oder Audio Pro
+> verbunden. **Ohne die Hardware entwickelt: Rückmeldungen sind willkommen.**
+> Die Integration folgt der HTTP-API, die diese Player gemeinsam haben, und den Antworten
+> echter Player, die das Home-Assistant-Projekt veröffentlicht hat; sag uns, was
+> mit deinem Modell funktioniert und was nicht.
+
+## Überblick
+
+Die Integration spricht mit jedem Player über seine lokale HTTP-API
+(`/httpapi.asp`), die auf jeder LinkPlay-Firmware gleich ist. Kein Konto, keine
+Cloud.
+
+Bekannte Player: WiiM Mini, Pro, Pro Plus, Amp, Amp Pro, Amp Ultra, Ultra;
+Arylic Up2Stream (Amp, Pro, Mini, Plate Amp), S10+, S50+, S50 Pro, A30, A50,
+A50+; Audio Pro C3, C10, A10 (erste Generation); iEAST AudioCast M5; ArtSound
+Smart Zone 4, Smart Hyde; GGMM E2; Modelle von Medion, August, Triangle und
+Muzo. Andere LinkPlay-Player funktionieren meist auch, unter einem generischen
+Namen.
+
+**LinkPlay oder DLNA?** Die DLNA-Integration spielt Medien auf jedem
+UPnP-Gerät ab, LinkPlay-Player eingeschlossen. LinkPlay ist die vollständige
+Steuerung dieser Player: Eingänge (TV, optisch, Bluetooth...),
+Voreinstellungen, Multiroom-Gruppen, WiiM-Equalizer, Durchsagen über die Musik.
+Wähle für einen Player eine der beiden, damit er nicht doppelt in Gladys ist.
+
+## Voraussetzungen
+
+- Gladys 5.2.0 oder neuer.
+- Die Player im Netzwerk von Gladys, bereits mit ihrer App eingerichtet (WiiM
+  Home, 4STREAM, Audio Pro...).
+- Für die automatische Erkennung: Gladys und die Player im selben Netz (mDNS
+  und SSDP gehen nicht über Router). Sonst gib ihre Adressen an.
+
+## Konfiguration
+
+### Die Player finden
+
+Öffne den Tab **Entdecken** der Integration: Die von Gladys gefundenen Player
+(mDNS `_linkplay._tcp` und SSDP) erscheinen dort; füge die gewünschten hinzu.
+Ein Player, der einer Multiroom-Gruppe folgt, wird über den Gruppenleiter
+gefunden.
+
+### Konfigurationsfelder
+
+| Feld                            | Verwendung                                                                                                                                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Player-Adressen                 | Optional. IP-Adressen oder Hostnamen, durch Kommas getrennt, für Player, die die Erkennung nicht sieht (anderes Netz, VLAN). `http://` oder ein Port lassen sich angeben, wenn ein Player es braucht. |
+| Sprache der Namen und Meldungen | Namen der Funktionen der ab jetzt hinzugefügten Player (Gladys behält sie, sobald ein Player hinzugefügt ist), Namen der Quellen, Meldungen von Befehlen und Szenen. Standardmäßig Französisch.       |
+
+### Aktionen
+
+- **Player suchen**: sucht sofort, aktualisiert den Tab Entdecken und listet,
+  was geantwortet hat, die eingetragenen Adressen ohne Antwort und die
+  ignorierten Einträge.
+- **Adresse testen**: fragt eine Adresse ab und zeigt Modell, Firmware, wie
+  der Player antwortet (HTTPS oder HTTP) und seine Quellen.
+
+## Was jeder Player kann
+
+Jeder Player ist ein Gladys-Gerät, benannt wie in seiner App.
+
+### Wiedergabe und Lautstärke
+
+| Funktion                    | Typ                      | Was sie tut                                                 |
+| --------------------------- | ------------------------ | ----------------------------------------------------------- |
+| Wiedergabe                  | music / play             | Setzt die Wiedergabe fort                                   |
+| Pause                       | music / pause            | Pausiert                                                    |
+| Stopp                       | television / stop        | Stoppt (eine Schaltfläche in der Raumkarte)                 |
+| Vorheriger / Nächster Titel | music / previous, next   | Vorheriger oder nächster Titel                              |
+| Lautstärke                  | music / volume (0-100)   | Liest und setzt die Lautstärke                              |
+| Stumm                       | television / volume-mute | Schaltet stumm, oder wieder laut, wenn stumm (Schaltfläche) |
+| Wiedergabestatus            | music / playback_state   | 1 während der Wiedergabe, sonst 0 (im Verlauf gespeichert)  |
+
+Das Musik-Widget des Gladys-Dashboards nutzt diese Funktionen.
+
+### Quelle und Equalizer
+
+- **Quelle** (eine Liste): die Eingänge dieses Players — Netzwerk (WLAN),
+  Bluetooth, Line-Eingang, optisch, koaxial, HDMI / ARC, Phono, USB... Eine
+  Auswahl schaltet den Player darauf um. Ein Player, der einer Gruppe folgt,
+  hat keine eigene Quelle.
+- **Equalizer** (nur WiiM): die Equalizer-Voreinstellungen des WiiM (Flat,
+  Rock, Jazz...) oder „Aus“. Die WiiM-API sagt, ob der Equalizer an ist, aber
+  nicht welcher: einer, der in der App WiiM Home gewählt wurde, bleibt
+  unbekannt, bis du ihn in Gladys wählst.
+
+### Titel und Gruppe
+
+- **Titel**, **Interpret**, **Album**: was gerade läuft; „—“, wenn die Quelle
+  nichts liefert (ein Eingang, ein Player, der einer Gruppe folgt).
+- **Multiroom-Gruppe**: „Nicht gruppiert“, „Führt: Küche, Schlafzimmer“ oder
+  „Folgt: Wohnzimmer“.
+
+### Auf einem Lautsprecher sprechen
+
+Die Aktion **Auf einem Lautsprecher sprechen** der Gladys-Szenen spricht auf
+dem Player. Auf einem WiiM läuft die Durchsage über der Musik, die danach
+weiterläuft. Auf einer Firmware ohne diesen Befehl ersetzt die Durchsage die
+Musik: Lief ein Eingang (TV, Line-In...), schaltet der Player danach zurück;
+ein Netzwerk-Stream (Spotify, ein Webradio) startet nicht neu — starte ihn mit
+einer Voreinstellung in der nächsten Aktion der Szene. Gladys gibt die
+Lautstärke der Aktion nicht an die Integration weiter.
+
+## Widget
+
+Das Widget **LinkPlay** (Dashboard → Box hinzufügen → LinkPlay, dann den Player
+wählen) zeigt Titel, Interpret und Album, die Lautstärke live, Quelle, Status
+und Gruppe sowie vier Schaltflächen: **Zurück**, **Abspielen / Pause**,
+**Weiter** und **Voreinstellungen**, die die Liste der Voreinstellungen öffnet
+(mit Namen auf einem WiiM) und die gewählte abspielt.
+
+## Szenen-Auslöser
+
+**LinkPlay-Quelle gewechselt**: Ein Player hat auf einen anderen Eingang
+gewechselt. Filter: der Player (leer: beliebig) und die neuen Quellen (leer:
+beliebig). Variablen: Player, neue Quelle (Name und Schlüssel), vorherige
+Quelle (Schlüssel).
+
+Er löst nicht aus, wenn die Quelle in Gladys gewählt wurde (eine Szene könnte
+sich sonst im Kreis drehen), und nicht während einer Durchsage.
+
+## Szenen-Aktionen
+
+| Aktion                            | Felder                                                   | Ergebnis                       |
+| --------------------------------- | -------------------------------------------------------- | ------------------------------ |
+| LinkPlay-Voreinstellung abspielen | Player, Nummer der Voreinstellung, Lautstärke (optional) | Name der Voreinstellung (WiiM) |
+| Adresse auf LinkPlay abspielen    | Player, http(s)-Adresse, Lautstärke (optional)           | —                              |
+| LinkPlay-Player gruppieren        | Beitretender Player, Gruppenleiter                       | —                              |
+| LinkPlay-Player aus Gruppe lösen  | Player                                                   | —                              |
+
+Die Voreinstellungen sind die in der App des Players gespeicherten (6 bis 12
+je nach Modell). Einen Gruppenleiter zu lösen, löst seine ganze Gruppe auf.
+
+## Szenen-Beispiele
+
+- **Filmabend**: Auslöser „LinkPlay-Quelle gewechselt“, Player „Wohnzimmer“,
+  Quelle „HDMI ARC“ → das Licht im Wohnzimmer dimmen.
+- **Wecken**: jeden Werktag um 7:00 → „LinkPlay-Voreinstellung abspielen“ auf
+  „Küche“, Voreinstellung 1, Lautstärke 20, dann „LinkPlay-Player
+  gruppieren“: „Bad“ tritt „Küche“ bei.
+- **Türklingel**: Es klingelt → „Auf einem Lautsprecher sprechen“ auf
+  „Wohnzimmer“: „Jemand ist an der Tür“.
+- **Haus verlassen**: Das Haus ist leer → „aus Gruppe lösen“, dann jeden
+  Player stoppen.
+
+## Aktualisierung und Netzwerkverkehr
+
+Die Integration fragt die zu Gladys hinzugefügten Player selbst ab: alle
+5 Sekunden während der Wiedergabe, sonst alle 30 Sekunden, jede Minute, solange
+ein Player nicht antwortet, und direkt nach einem Befehl. Eine Abfrage sind
+eine oder zwei Anfragen im lokalen Netz; Gruppe und Equalizer werden alle
+30 Sekunden gelesen, die Player-Details alle 10 Minuten. Die Player haben kein
+Kontingent; nichts verlässt dein Netzwerk.
+
+Nur geänderte Werte gehen an Gladys (und trotzdem alle 6 Stunden, damit Gladys
+sie nie als veraltet zeigt). Das Netzwerk wird beim Start durchsucht, mit
+**Player suchen** und alle 5 Minuten, solange ein hinzugefügter Player fehlt
+(eine neue Adresse nach einem Router-Neustart wird von selbst wiedergefunden).
+
+## Fehlerbehebung
+
+- **Ein Player wird nicht gefunden**: Er ist in einem anderen Netz, oder mDNS
+  / SSDP erreichen Gladys nicht. Nutze **Adresse testen** und trage dann seine
+  Adresse in der Konfiguration ein.
+- **„antwortet nicht“**: Prüfe, ob der Player eingeschaltet und im Netzwerk
+  ist. Die Integration versucht HTTPS (Port 443, das selbstsignierte
+  Zertifikat des Players wird akzeptiert), dann HTTP (Port 80).
+- **Eine Quelle fehlt in der Liste**: Der Player meldet sie nicht; nenn uns
+  sein Modell.
+- **Die Titel zeigen „—“**: Die Quelle liefert keine Titel (ein Eingang,
+  manche Dienste).
+- **Mehr Details**: Setze die Variable `LOG_LEVEL` der Integration auf
+  `debug`; die Protokolle zeigen die Adresse einer Durchsage nie vollständig.
+
+## Einschränkungen
+
+- Ohne die Hardware entwickelt: Die Befehle stammen aus der gemeinsamen
+  LinkPlay-API und aus öffentlichen Antworten echter Player, nicht aus einem
+  Test jedes Modells.
+- Die neueren Audio-Pro-Player, die nur auf Port 4443 mit einem
+  Client-Zertifikat antworten, werden noch nicht unterstützt.
+- Namen der Voreinstellungen gibt es nur von WiiM-Playern; sonst sind sie
+  nummeriert.
+- Kein Spulen, keine Zufallswiedergabe, keine Wiederholung, kein Durchsuchen
+  einer Musikbibliothek: Das macht die DLNA-Integration.
+- Ein Player, der einer Gruppe folgt, zeigt keine Titel; die Lautstärke einer
+  ganzen Gruppe wird nicht verwaltet (jeder Player behält seine eigene).
+- Der Zustand des Equalizers ist unbekannt, wenn er in der App WiiM Home
+  geändert wurde.
