@@ -10,6 +10,12 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Fixed
+
+- The container no longer crashes at startup: the JPEG encoder used to resize
+  large covers (`jpeg-js`) is now installed in the image (it was only a
+  development dependency in 1.1.0).
+
 ## [1.1.0] - 2026-10-26
 
 ### Added
