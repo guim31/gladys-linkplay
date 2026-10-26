@@ -186,7 +186,9 @@ export class LinkPlayHub {
 
   /** The presets of a player: number and name (WiiM), 1 to its preset count. */
   presetsOf(player) {
-    const count = player.info?.presetCount ?? 6;
+    // A WiiM may name more presets than its preset_key says.
+    const named = [...(player.info?.presetNames?.keys() ?? [])];
+    const count = Math.max(player.info?.presetCount ?? 6, ...named);
     return Array.from({ length: count }, (_, index) => ({
       number: index + 1,
       name: player.info?.presetNames?.get(index + 1) ?? null,
@@ -710,7 +712,7 @@ export class LinkPlayHub {
       () => player.setLoop(shuffle, repeat, this.wait),
     );
     if (!done) {
-      logger.info(`${this.nameOf(player)}: shuffle and repeat unchanged by the player`);
+      logger.debug(`${this.nameOf(player)}: shuffle and repeat unchanged by the player`);
       throw new Error(this.texts.loopRefused(this.nameOf(player)));
     }
   }
@@ -763,7 +765,7 @@ export class LinkPlayHub {
   }
 
   async playPreset(player, preset) {
-    const max = player.info?.presetCount ?? 6;
+    const max = this.presetsOf(player).length;
     const number = Number(preset);
     if (!Number.isInteger(number) || number < 1 || number > max) {
       throw new Error(this.texts.invalidPreset(max));

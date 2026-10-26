@@ -48,9 +48,16 @@ export class FakePlayer {
    * @param {boolean} [options.prompt] knows playPromptUrl
    * @param {object} [options.status] getStatusEx overrides
    * @param {'reported' | 'legacy' | 'source'} [options.loopTable] see loopMode()
+   * @param {number} [options.loopDelay] status reads before a loop mode shows
    */
-  constructor(folder, { https = true, prompt = true, status = {}, loopTable = 'reported' } = {}) {
+  constructor(
+    folder,
+    { https = true, prompt = true, status = {}, loopTable = 'reported', loopDelay = 0 } = {},
+  ) {
     this.loopTable = loopTable;
+    this.loopDelay = loopDelay;
+    this.pendingLoop = null;
+    this.metaFails = false;
     this.answers = loadFixtures(folder);
     this.statusEx = { ...this.answers.getStatusEx, ...status };
     this.hasEx = this.answers.getPlayerStatusEx !== undefined;
@@ -88,10 +95,16 @@ export class FakePlayer {
       case 'getStatusEx':
         return this.json(this.statusEx);
       case 'getPlayerStatusEx':
+        this.applyPendingLoop();
         return this.hasEx ? this.json(this.player) : 'unknown command';
       case 'getPlayerStatus':
+        this.applyPendingLoop();
         return this.json(this.player);
       case 'getMetaInfo':
+        if (this.metaFails) {
+          return 'Failed';
+        }
+      // falls through
       case 'EQGetList':
       case 'EQGetStat':
       case 'getPresetInfo':
@@ -128,7 +141,8 @@ export class FakePlayer {
    */
   loopMode(mode) {
     if (this.loopTable === 'reported' && mode >= 0 && mode <= 5) {
-      this.set({ loop: String(mode) });
+      this.pendingLoop = { loop: String(mode), reads: this.loopDelay };
+      this.applyPendingLoop(0);
     }
     if (this.loopTable === 'legacy') {
       const reads = { '-1': '0', 0: '4', 1: '1', 2: '2' }[mode];
@@ -137,6 +151,17 @@ export class FakePlayer {
       }
     }
     return 'OK';
+  }
+
+  /** A slow firmware (`loopDelay`): the loop mode shows after that many reads. */
+  applyPendingLoop(step = 1) {
+    if (this.pendingLoop) {
+      this.pendingLoop.reads -= step;
+      if (this.pendingLoop.reads <= 0) {
+        this.set({ loop: this.pendingLoop.loop });
+        this.pendingLoop = null;
+      }
+    }
   }
 
   playerCommand([action, ...args]) {

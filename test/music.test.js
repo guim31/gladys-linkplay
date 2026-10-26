@@ -396,3 +396,58 @@ test('a 1.0 player: "Update" turns its texts and mute into music features, same 
   await env.gladys.fake.deviceUpdated(old);
   assert.equal(music(env, SALON).title, 'Clair de lune');
 });
+
+test('review fixes: AirPlay covers per track, metadata kept through a failed read', async () => {
+  const players = defaultPlayers();
+  players[SALON].answers.getMetaInfo = WIIM['getMetaInfo-airplay'];
+  players[SALON].set({ mode: '1', status: 'play' });
+  const env = await setup({ players });
+  const first = music(env, SALON).artwork;
+  // AirPlay serves every cover at the same URL: the key still follows the track.
+  players[SALON].answers.getMetaInfo = {
+    metaData: { ...WIIM['getMetaInfo-airplay'].metaData, title: 'Freddie Freeloader' },
+  };
+  await poll(env, SALON);
+  const second = music(env, SALON).artwork;
+  assert.match(second, /^art-/);
+  assert.notEqual(second, first);
+  // A getMetaInfo that fails once: same track, titles and artwork kept.
+  players[SALON].metaFails = true;
+  const before = env.gladys.fake.states.length;
+  await poll(env, SALON);
+  assert.equal(music(env, SALON).title, 'Freddie Freeloader');
+  assert.equal(music(env, SALON).artwork, second);
+  assert.equal(env.gladys.fake.states.length, before, 'nothing republished');
+});
+
+test('review fixes: a slow player is read back until it shows the mode; unsafe covers', async () => {
+  const slow = new FakePlayer('arylic-up2stream-amp-v4', {
+    https: false,
+    prompt: false,
+    loopDelay: 2,
+  });
+  const env = await setup({ players: { ...defaultPlayers(), [BUREAU]: slow } });
+  // The line-in answer has loop 3 (shuffle, no repeat).
+  assert.deepEqual(await command(env, BUREAU, 'repeat', REPEAT.ALL), { success: true });
+  assert.deepEqual(
+    slow.orders.filter((o) => o.startsWith('setPlayerCmd:loopmode')),
+    ['setPlayerCmd:loopmode:2'],
+    'no second value written while the slow player catches up',
+  );
+
+  assert.equal(isLanHost('10.cdn.example.com'), false);
+  assert.equal(isLanHost('192.168.1.5.nip.io'), false);
+  assert.equal(isLanHost('fd12:3456::1'), true);
+  const network = artworkNetwork({
+    'https://cdn.example/r.jpg': {
+      status: 302,
+      location: 'http://192.168.1.1/admin',
+      body: Buffer.alloc(0),
+    },
+  });
+  await assert.rejects(
+    downloadArtwork('https://cdn.example/r.jpg', { get: network.get }),
+    /local network/,
+  );
+  await assert.rejects(downloadArtwork('http://127.0.0.1/a.jpg', { get: network.get }), /local/);
+});

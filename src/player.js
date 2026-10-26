@@ -5,6 +5,7 @@
 // No Gladys here: src/hub.js decides when to read and what to publish.
 // -----------------------------------------------------------------------------
 
+import { createHash } from 'node:crypto';
 import { LinkPlayClient } from './linkplay/client.js';
 import { LinkPlayError } from './linkplay/http.js';
 import {
@@ -22,8 +23,12 @@ import {
 } from './linkplay/status.js';
 import { EQUALIZER_OFF } from './devices.js';
 
-// A player applies a loop mode within a few hundred milliseconds.
-export const LOOP_CHECK_MS = 400;
+// A player applies a loop mode within a few hundred milliseconds: read back
+// up to LOOP_CHECKS times before deciding it ignored the value.
+export const LOOP_CHECK_MS = 250;
+const LOOP_CHECKS = 3;
+// What the older WiiM write table (`loopmode`) reads back as `loop`.
+const LEGACY_READS = { '-1': '0', 0: '4', 1: '1', 2: '2' };
 
 /** An http(s) URL a player can fetch, else null. */
 export function playableUrl(value) {
@@ -170,15 +175,25 @@ export class Player {
     // leaves out. WiiM firmwares and some others (a Muzo Mini on 4.6,
     // home-assistant/core#187893) know it; a firmware that does not is not
     // asked again, and gives no artwork (only over UPnP, not read here).
+    const reported = [status.source, status.title, status.artist, status.album].join('|');
+    let meta = null;
     if (status.playback !== PLAYBACK.STOPPED && !status.follower) {
-      const meta = await this.optional('getMetaInfo', parseMetaInfo).catch(() => null);
-      if (meta) {
-        status.artworkUrl = meta.artworkUrl;
-        if (!status.title) {
-          status.title = meta.title;
-          status.artist ||= meta.artist;
-          status.album ||= meta.album;
-        }
+      meta = await this.optional('getMetaInfo', parseMetaInfo).catch(() => null);
+    }
+    const previous = this.snapshot;
+    if (!meta && previous?.reported === reported) {
+      // Not asked (stopped) or failed this time, same track as before: keep
+      // what getMetaInfo said, rather than blink the titles and artwork.
+      meta = previous.meta;
+    }
+    status.reported = reported;
+    status.meta = meta;
+    if (meta) {
+      status.artworkUrl = this.trackArtwork(meta);
+      if (!status.title) {
+        status.title = meta.title;
+        status.artist ||= meta.artist;
+        status.album ||= meta.album;
       }
     }
     if (group) {
@@ -205,6 +220,28 @@ export class Player {
     }
     this.snapshot = { ...status, followers: this.followers, equalizer: this.equalizer };
     return this.snapshot;
+  }
+
+  /**
+   * The artwork URL of a getMetaInfo answer. A cover served by the player
+   * itself (AirPlay: always /data/AirplayArtWorkData.jpeg) keeps its URL from
+   * one track to the next: a fragment naming the track (never sent) makes its
+   * artwork key change with the track, as Gladys caches an image by key.
+   */
+  trackArtwork(meta) {
+    if (!meta.artworkUrl) {
+      return null;
+    }
+    const url = new URL(meta.artworkUrl);
+    if (url.hostname !== this.client.hostname && url.hostname !== this.ip) {
+      return meta.artworkUrl;
+    }
+    const track = createHash('sha1')
+      .update([meta.title, meta.artist, meta.album].join('|'))
+      .digest('hex')
+      .slice(0, 12);
+    url.hash = `track-${track}`;
+    return url.href;
   }
 
   // --- Orders ---------------------------------------------------------------
@@ -262,32 +299,65 @@ export class Player {
   }
 
   /**
-   * Shuffle and repeat, through `loopmode`. Firmwares do not agree on the
-   * values to write (see loopModesFor): each candidate is checked by reading
-   * the status back, and the one that worked is tried first next time.
+   * Shuffle and repeat, through `loopmode`. Firmwares read `loop` alike but
+   * do not write it alike (see loopModesFor): each value is checked by
+   * reading the status back (a few times: a player may take a moment), the
+   * write table it reveals is kept, and a value the player took with another
+   * meaning is undone.
    * @param {boolean} shuffle
    * @param {number} repeat REPEAT value
    * @param {(ms: number) => Promise<void>} wait
    * @returns {Promise<boolean>} whether the player reports the combination
    */
   async setLoop(shuffle, repeat, wait) {
-    const candidates = loopModesFor(shuffle, repeat);
-    if (this.loopModes?.has(`${shuffle}:${repeat}`)) {
-      candidates.unshift(this.loopModes.get(`${shuffle}:${repeat}`));
+    const read = async () => parsePlayerStatus(await this.client.json(this.playerCommand));
+    const decode = (status) =>
+      decodeLoop(status.loop, { wiim: this.info?.wiim, source: status.source });
+    const first = await read();
+    const original = decode(first);
+    let current = first.loop;
+    let candidates = loopModesFor(shuffle, repeat);
+    if (this.loopTable === 'legacy') {
+      candidates = [...candidates].reverse();
     }
-    for (const mode of [...new Set(candidates)]) {
+    for (const mode of candidates) {
       await this.client.ok(`setPlayerCmd:loopmode:${mode}`);
-      await wait(LOOP_CHECK_MS);
-      const status = parsePlayerStatus(await this.client.json(this.playerCommand));
-      const loop = decodeLoop(status.loop, { wiim: this.info?.wiim, source: status.source });
+      let status = null;
+      for (let check = 0; check < LOOP_CHECKS; check += 1) {
+        await wait(LOOP_CHECK_MS);
+        status = await read();
+        if (status.loop !== current) {
+          break;
+        }
+      }
+      const loop = decode(status);
       if (loop?.shuffle === shuffle && loop?.repeat === repeat) {
-        this.loopModes ??= new Map();
-        this.loopModes.set(`${shuffle}:${repeat}`, mode);
+        this.loopTable =
+          LEGACY_READS[mode] === status.loop && String(mode) !== status.loop
+            ? 'legacy'
+            : 'reported';
         if (this.snapshot) {
           this.snapshot.loop = status.loop;
         }
         return true;
       }
+      if (status.loop === current) {
+        continue; // ignored: try the other table
+      }
+      if (LEGACY_READS[mode] === status.loop) {
+        // The older WiiM table took it: its own value comes next.
+        this.loopTable = 'legacy';
+        current = status.loop;
+        continue;
+      }
+      break;
+    }
+    // Not reached: put back what the player had, if it moved.
+    const now = await read();
+    if (original && now.loop !== first.loop) {
+      const back = loopModesFor(original.shuffle, original.repeat);
+      const mode = this.loopTable === 'legacy' ? back.at(-1) : back[0];
+      await this.client.ok(`setPlayerCmd:loopmode:${mode}`).catch(() => {});
     }
     return false;
   }

@@ -11,6 +11,7 @@
 //     queue, no search, no library: the catalog is the presets, at the root.
 // -----------------------------------------------------------------------------
 
+import { isIP } from 'node:net';
 import { MUSIC_MEDIA_TYPES, createLogger } from '@gladysassistant/integration-sdk';
 import { MAX_ARTWORK_DOWNLOAD, prepareArtwork } from './artwork-resize.js';
 import { PLAYBACK_STATE } from './devices.js';
@@ -71,11 +72,20 @@ const REDIRECTS = 3;
  */
 export function isLanHost(hostname) {
   const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  return (
-    /^(10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) ||
-    host.endsWith('.local') ||
-    /^(fe80|fc|fd)[0-9a-f]*:/.test(host)
-  );
+  const family = isIP(host);
+  if (family === 4) {
+    return /^(10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host);
+  }
+  if (family === 6) {
+    return /^(fe[89ab][0-9a-f]|f[cd][0-9a-f]{2}):/.test(host);
+  }
+  return host.endsWith('.local');
+}
+
+/** Loopback or unspecified: never fetched (the container itself). */
+function isLocalHost(hostname) {
+  const host = hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  return /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|::1?|::ffff:127\..*)$/.test(host);
 }
 
 /**
@@ -90,15 +100,26 @@ export async function downloadArtwork(
 ) {
   const deadline = Date.now() + timeoutMs;
   let current = url;
+  let fromLan = true;
   for (let hop = 0; hop <= REDIRECTS; hop += 1) {
     const target = new URL(current);
+    target.hash = ''; // a track marker (Player.trackArtwork), never sent
     if (!['http:', 'https:'].includes(target.protocol)) {
       throw new Error('not an http(s) URL');
     }
+    if (isLocalHost(target.hostname)) {
+      throw new Error('a local address');
+    }
+    const lan = isLanHost(target.hostname) || trusted(target.hostname);
+    if (hop > 0 && lan && !fromLan) {
+      // An Internet cover that redirects into the LAN: not followed.
+      throw new Error('redirected to the local network');
+    }
+    fromLan = lan;
     const answer = await get(target.href, {
       timeoutMs: Math.max(1000, deadline - Date.now()),
       maxBytes: MAX_ARTWORK_DOWNLOAD,
-      insecure: isLanHost(target.hostname) || trusted(target.hostname),
+      insecure: lan,
     });
     if (answer.status >= 300 && answer.status < 400 && answer.location) {
       current = new URL(answer.location, target).href;
