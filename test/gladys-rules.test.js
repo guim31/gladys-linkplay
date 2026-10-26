@@ -141,6 +141,11 @@ test('the external ids are the uuid of the player, never its name or address', (
       'equalizer',
       'group',
       'notification',
+      'artwork',
+      'duration',
+      'position',
+      'shuffle',
+      'repeat',
     ],
   );
 });
@@ -153,7 +158,10 @@ test('every state the integration publishes goes to a feature of a published dev
   assert.ok(gladys.fake.states.length > 20);
   for (const state of gladys.fake.states) {
     assert.ok(features.has(state.device_feature_external_id), state.device_feature_external_id);
-    if (state.text !== undefined) {
+    // A text/text state is never empty (the core ignores it); the music
+    // strings are emptied on purpose when nothing is loaded.
+    const music = /:(title|artist|album|artwork)$/.test(state.device_feature_external_id);
+    if (state.text !== undefined && !music) {
       assert.ok(state.text.length > 0, 'a text state is never empty');
     }
   }

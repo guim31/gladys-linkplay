@@ -19,6 +19,7 @@ export const MAX_BODY_BYTES = 256 * 1024;
 // request every few seconds gains nothing from holding one open.
 const httpAgent = new http.Agent({ keepAlive: false });
 const insecureAgent = new https.Agent({ rejectUnauthorized: false, keepAlive: false });
+const secureAgent = new https.Agent({ keepAlive: false });
 
 /** A failed exchange, with a code the callers branch on. */
 export class LinkPlayError extends Error {
@@ -39,10 +40,27 @@ export class LinkPlayError extends Error {
  * @param {{ timeoutMs?: number }} [options]
  * @returns {Promise<{ status: number, body: string }>}
  */
-export function httpGet(url, { timeoutMs = 5000 } = {}) {
+export async function httpGet(url, { timeoutMs = 5000 } = {}) {
+  const answer = await httpGetBytes(url, { timeoutMs, insecure: true });
+  return { status: answer.status, body: answer.body.toString('utf8') };
+}
+
+/**
+ * GET a URL, resolve its raw bytes. Used for the players (`insecure`: their
+ * self-signed certificate is accepted) and for artwork (src/music.js), where
+ * only a LAN address is `insecure`.
+ * @param {string} url
+ * @param {{ timeoutMs?: number, maxBytes?: number, insecure?: boolean }} [options]
+ * @returns {Promise<{ status: number, location: string | null, body: Buffer }>}
+ */
+export function httpGetBytes(
+  url,
+  { timeoutMs = 5000, maxBytes = MAX_BODY_BYTES, insecure = false } = {},
+) {
   const target = new URL(url);
   const secure = target.protocol === 'https:';
   const lib = secure ? https : http;
+  const agent = secure ? (insecure ? insecureAgent : secureAgent) : httpAgent;
   return new Promise((resolve, reject) => {
     let settled = false;
     const finish = (fn, value) => {
@@ -52,32 +70,27 @@ export function httpGet(url, { timeoutMs = 5000 } = {}) {
         fn(value);
       }
     };
-    const request = lib.get(
-      target,
-      { agent: secure ? insecureAgent : httpAgent, headers: { Accept: '*/*' } },
-      (response) => {
-        const chunks = [];
-        let size = 0;
-        response.on('data', (chunk) => {
-          size += chunk.length;
-          if (size > MAX_BODY_BYTES) {
-            request.destroy();
-            finish(reject, new LinkPlayError('invalid', 'answer too large'));
-            return;
-          }
-          chunks.push(chunk);
-        });
-        response.on('end', () =>
-          finish(resolve, {
-            status: response.statusCode ?? 0,
-            body: Buffer.concat(chunks).toString('utf8'),
-          }),
-        );
-        response.on('error', (err) =>
-          finish(reject, new LinkPlayError('unreachable', err.message)),
-        );
-      },
-    );
+    const request = lib.get(target, { agent, headers: { Accept: '*/*' } }, (response) => {
+      const chunks = [];
+      let size = 0;
+      response.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > maxBytes) {
+          request.destroy();
+          finish(reject, new LinkPlayError('invalid', 'answer too large'));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      response.on('end', () =>
+        finish(resolve, {
+          status: response.statusCode ?? 0,
+          location: response.headers.location ?? null,
+          body: Buffer.concat(chunks),
+        }),
+      );
+      response.on('error', (err) => finish(reject, new LinkPlayError('unreachable', err.message)));
+    });
     const timer = setTimeout(() => {
       request.destroy();
       finish(reject, new LinkPlayError('timeout', `no answer within ${timeoutMs} ms`));

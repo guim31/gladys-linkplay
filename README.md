@@ -27,7 +27,7 @@ names are the trademarks of their owners._
 
 ## Requirements
 
-- Gladys 5.2.0 or later.
+- Gladys 5.3.0 or later (SDK 0.16.0).
 - LinkPlay players on the network of Gladys, already set up with their app.
 - No account, no cloud, nothing to install on the players.
 
@@ -62,6 +62,32 @@ linked from the Configuration screen of Gladys.
   (WiiM). Without it, the URL is played and the physical input that was
   playing comes back afterwards.
 
+## Gladys 5.3 music player
+
+Each player is a music player of the Gladys 5.3 Music box (see the
+documentation, section "Gladys 5.3 music player"):
+
+- now playing from `getPlayerStatusEx` (hex titles, `curpos` / `totlen` in
+  ms, `loop`, `mute`, `vol`), published with `publishNowPlaying` (one batch
+  per change, the position only on an event or a seek);
+- artwork from `getMetaInfo` (`albumArtURI`, WiiM and some other firmwares;
+  the others only give it over UPnP, which is not read): downloaded by the
+  container (self-signed HTTPS accepted for a LAN host or a player), made
+  400 px wide in plain JavaScript (`src/artwork-resize.js`, from
+  gladys-mopidy) when over 300 KB;
+- commands: playback state (`pause`, `resume`, `stop`), seek
+  (`setPlayerCmd:seek:<s>`), mute, shuffle and repeat (`loopmode`: the value
+  each firmware writes differs, so each candidate is checked by reading the
+  status back and the one that worked is remembered);
+- `"music": { "browse": true }`: the presets at the root, played with
+  `MCUKeyShortClick:<n>`. No queue or search in the LinkPlay API.
+
+Players added with 1.0 get the new features through **Update** in the
+Discover tab; the 1.0 ids are kept (title, artist, album and mute change
+category in place). Checked against real answers quoted in public issues
+(`test/fixtures/players/README.md`), replayed by fake players, also over real
+HTTP and self-signed HTTPS sockets: **never against a real player**.
+
 ## Limitations
 
 - Developed without the hardware (see above).
@@ -69,8 +95,9 @@ linked from the Configuration screen of Gladys.
   certificate are not supported yet.
 - Preset names come from WiiM players only (`getPresetInfo`); elsewhere the
   presets are numbered.
-- No seek, shuffle, repeat or library browsing (the DLNA integration does the
-  browsing); no volume for a whole group; no titles on a group follower.
+- No queue, search or library browsing (the DLNA integration does the
+  browsing); no artwork without `getMetaInfo`; no volume for a whole group; no
+  titles on a group follower.
 - The WiiM API tells whether the equalizer is on, not which preset: a preset
   chosen in the WiiM Home app shows as unknown.
 

@@ -64,15 +64,15 @@ Each player is one Gladys device, named as in its app.
 
 ### Playback and volume
 
-| Feature        | Type                     | What it does                                       |
-| -------------- | ------------------------ | -------------------------------------------------- |
-| Play           | music / play             | Resumes the playback                               |
-| Pause          | music / pause            | Pauses                                             |
-| Stop           | television / stop        | Stops (a button in the room card)                  |
-| Previous, Next | music / previous, next   | Previous or next track                             |
-| Volume         | music / volume (0-100)   | Reads and sets the volume                          |
-| Mute           | television / volume-mute | Mutes, or unmutes when muted (a button)            |
-| Playback state | music / playback_state   | 1 while playing, 0 otherwise (kept in the history) |
+| Feature        | Type                   | What it does                                                  |
+| -------------- | ---------------------- | ------------------------------------------------------------- |
+| Play           | music / play           | Resumes the playback                                          |
+| Pause          | music / pause          | Pauses                                                        |
+| Stop           | television / stop      | Stops (a button in the room card)                             |
+| Previous, Next | music / previous, next | Previous or next track                                        |
+| Volume         | music / volume (0-100) | Reads and sets the volume                                     |
+| Mute           | music / mute           | Mutes or unmutes (a toggle before "Update", see below)        |
+| Playback state | music / playback_state | 1 playing, 0 paused, 2 stopped, 3 loading; writable (0, 1, 2) |
 
 The Music widget of the Gladys dashboard uses these features.
 
@@ -89,7 +89,7 @@ The Music widget of the Gladys dashboard uses these features.
 
 ### Titles and group
 
-- **Title**, **Artist**, **Album**: what plays; "—" when the source gives
+- **Title**, **Artist**, **Album**: what plays; empty when the source gives
   nothing (an input, a player following a group).
 - **Multiroom group**: "Not grouped", "Leads: Kitchen, Bedroom" or
   "Follows: Living room".
@@ -103,6 +103,35 @@ input (TV, line in...) was playing, the player switches back to it afterwards;
 a network stream (Spotify, a web radio) is not restarted — start it again with
 a preset in the next action of the scene. Gladys does not pass the volume of
 the action to the integration.
+
+## Gladys 5.3 music player
+
+Since Gladys 5.3, the **Music** box of the dashboard is a real player. For
+each LinkPlay player it shows:
+
+- the **artwork** (WiiM and recent firmwares that give it; a large one, from
+  AirPlay or a Plex server, is made 400 pixels wide by the integration), the
+  title, the artist and the album;
+- a **progress bar** you drag to move within the track (not on a radio or an
+  input, which have no length);
+- play, pause, stop, previous, next, **shuffle**, **repeat** (off, all, one
+  track), **mute** and volume;
+- the browse button opens the **presets** of the player (named on a WiiM,
+  numbered elsewhere): a tap plays one. The **Play music on a speaker** scene
+  action offers them too.
+
+Shuffle and repeat follow the source in use: Spotify Connect, AirPlay or Tidal
+Connect may keep their own settings, and Gladys then says so. Firmwares do not
+all write these modes with the same values: the integration checks the
+player's answer and keeps the one that works.
+
+**A player added before version 1.1.0** keeps working as before: open the
+**Discover** tab of the integration and click **Update** on the player.
+Artwork, duration, position, shuffle and repeat are added; Title, Artist,
+Album and Mute become music features under the same ids (scenes and
+dashboards kept). **Playback state** changes: it is 2 (no longer 0) when the
+player is stopped, and it is no longer kept in the history (Gladys keeps no
+history of music features).
 
 ## Widget
 
@@ -168,7 +197,7 @@ that Gladys never shows them as old). The network is searched at start-up, on
   is accepted), then HTTP (port 80).
 - **A source is missing from the list**: the player does not declare it; tell
   us its model.
-- **Titles show "—"**: the source gives no titles (an input, some services).
+- **Titles are empty**: the source gives no titles (an input, some services).
 - **More details**: set the `LOG_LEVEL` variable to `debug` on the
   integration; the logs never show the address of an announcement whole.
 
@@ -179,8 +208,9 @@ that Gladys never shows them as old). The network is searched at start-up, on
 - The recent Audio Pro players that only answer on port 4443 with a client
   certificate are not supported yet.
 - Preset names come from WiiM players only; elsewhere the presets are numbered.
-- No seek, shuffle or repeat, no browsing of a music library: the DLNA
-  integration does that.
+- No search, queue or music library (the LinkPlay API has none): the DLNA
+  integration does that. No artwork on firmwares without `getMetaInfo` (WiiM
+  and some recent ones have it).
 - A player following a group shows no titles; the volume of a whole group is
   not handled (each player keeps its own).
 - The equalizer state is unknown when changed from the WiiM Home app.

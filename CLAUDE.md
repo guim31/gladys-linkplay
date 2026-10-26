@@ -289,6 +289,16 @@ inconnue du firmware (alors plus redemandée : `Player.unsupported`), `Failed` q
 - **Audio Pro récents (port 4443)** : exigent un certificat client (mTLS). python-linkplay embarque celui
   de LinkPlay, clé privée comprise : **non recopié** dans ce dépôt public. Non pris en charge.
 
+**Lecteur Musique 5.3 (1.1.0, SDK 0.16)** : `publishNowPlaying` (ids 1.0 gardés par `featureExternalIds`,
+`MUSIC_KEYS`), position et durée = `curpos`/`totlen` en ms (0 = flux en direct, pas de seek). `loop` se lit
+pareil partout de 0 à 4 (0 tout, 1 un, 2 aléatoire + tout, 3 aléatoire, 4 rien ; 5 = aléatoire + un, ou « un »
+pour Spotify sur WiiM ; -1 = rien) mais **s'écrit différemment selon le firmware** (`loopmode` = valeur lue sur
+Ultra/Arylic/Audio Pro, ancienne table WiiM -1/0/1/2 ailleurs ; pywiim#23, Wiim-Dashboard) : chaque valeur est
+vérifiée par relecture et celle qui marche est retenue. Pochette : `getMetaInfo` `albumArtURI` seulement (WiiM,
+quelques autres firmwares ; sinon UPnP `GetInfoEx`, non lu), souvent sur le lecteur lui-même en HTTPS
+auto-signé (AirPlay) ou sur un Plex du LAN à 1000 px : réduite par `artwork-resize.js`. Placeholder `unknow`.
+Qobuz Connect rapporte `status: none` en jouant (publié IDLE, titres gardés).
+
 **Découverte** : mDNS `_linkplay._tcp` puis SSDP `MediaRenderer:1` (une seule entrée `ssdp` : le cœur ne
 scanne que la première ; un scan à la fois). Le SSDP ramène aussi téléviseurs et amplis : chacun reçoit un
 `getStatusEx` (2,5 s), et un non-LinkPlay n'est plus redemandé pendant 30 min. Les adresses configurées et

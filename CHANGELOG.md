@@ -10,6 +10,31 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+### Added
+
+- Gladys 5.3 music player: the Music box of the dashboard shows the artwork
+  (WiiM and firmwares that answer `getMetaInfo`; a large cover is made 400 px
+  wide in plain JavaScript, a cover on the player or a LAN server in
+  self-signed HTTPS is read), the duration and a position you can drag to
+  seek, shuffle and repeat (off, all, one), mute and volume. Shuffle and
+  repeat are checked by reading the player back: the value that works on its
+  firmware is kept.
+- The presets of each player in the music panel (named on a WiiM, numbered
+  elsewhere), playable from it and from the "Play music on a speaker" scene
+  action.
+
+### Changed
+
+- Requires Gladys 5.3.0 and SDK 0.16.0.
+- Players added with 1.0 keep working; click **Update** on them in the
+  Discover tab to get the new features. Title, artist and album (text) and
+  mute (a television button) become their music features under the same ids:
+  scenes and dashboards keep working, mute takes 0/1 instead of toggling.
+- **Playback state** is now writable (0 pause, 1 play, 2 stop), is **2** when
+  the player is stopped (was 0) and 3 while it loads, and is no longer kept in
+  the history. A scene on "playback state = 0" no longer fires on a stop.
+- Titles are empty (no longer "—") when the source gives none.
+
 ## [1.0.1] - 2026-10-13
 
 ### Added

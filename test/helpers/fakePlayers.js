@@ -47,8 +47,10 @@ export class FakePlayer {
    * @param {boolean} [options.https] answers on HTTPS 443 (else HTTP 80 only)
    * @param {boolean} [options.prompt] knows playPromptUrl
    * @param {object} [options.status] getStatusEx overrides
+   * @param {'reported' | 'legacy' | 'source'} [options.loopTable] see loopMode()
    */
-  constructor(folder, { https = true, prompt = true, status = {} } = {}) {
+  constructor(folder, { https = true, prompt = true, status = {}, loopTable = 'reported' } = {}) {
+    this.loopTable = loopTable;
     this.answers = loadFixtures(folder);
     this.statusEx = { ...this.answers.getStatusEx, ...status };
     this.hasEx = this.answers.getPlayerStatusEx !== undefined;
@@ -118,6 +120,25 @@ export class FakePlayer {
     }
   }
 
+  /**
+   * `loopmode:<n>` as the firmware of this fake writes it: `reported` takes
+   * the values it reports (0 to 5), `legacy` the older WiiM table (-1 all,
+   * 0 off, 1 one, 2 shuffle + all), `source` answers OK and changes nothing
+   * (a Spotify Connect session keeps its own modes).
+   */
+  loopMode(mode) {
+    if (this.loopTable === 'reported' && mode >= 0 && mode <= 5) {
+      this.set({ loop: String(mode) });
+    }
+    if (this.loopTable === 'legacy') {
+      const reads = { '-1': '0', 0: '4', 1: '1', 2: '2' }[mode];
+      if (reads !== undefined) {
+        this.set({ loop: reads });
+      }
+    }
+    return 'OK';
+  }
+
   playerCommand([action, ...args]) {
     const value = args.join(':');
     switch (action) {
@@ -139,6 +160,11 @@ export class FakePlayer {
       case 'mute':
         this.set({ mute: value });
         return 'OK';
+      case 'seek':
+        this.set({ curpos: String(Number(value) * 1000) });
+        return 'OK';
+      case 'loopmode':
+        return this.loopMode(Number(value));
       case 'switchmode':
         if (!MODE_OF[value]) {
           return 'Failed';

@@ -1,20 +1,29 @@
 // -----------------------------------------------------------------------------
 // The Gladys device of a LinkPlay player.
 //
-// The playback features follow the `music` category of the core: its Music
-// dashboard widget reads them (play, pause, previous, next, volume, playback
-// state) and its "Talk on a speaker" scene action targets play_notification.
-// The core has no music "stop" nor "mute": they borrow the television remote
-// keys, which the device card renders as push buttons. Titles and the group
-// are `text/text`; the source and the WiiM equalizer are `text/select`, whose
-// options (string values) are the ones THIS player has.
+// The playback features follow the `music` category of the core, completed by
+// Gladys 5.3 (capabilities/music.md): its Music widget reads the playback
+// state (writable: 0 pause, 1 play, 2 stop), title, artist, album, artwork,
+// duration, position (writable: seek), shuffle, repeat, mute and volume, and
+// its "Talk on a speaker" scene action targets play_notification. The 1.0
+// keys are kept: title, artist and album (text/text in 1.0) and mute (a
+// television push button in 1.0) become their music types under the same
+// external ids when the user clicks "Update" in Discover. The core has no
+// music "stop": it stays a television key, next to playback state 2. The
+// group is `text/text`; the source and the WiiM equalizer are `text/select`,
+// whose options (string values) are the ones THIS player has.
 //
 // The device is published with `should_poll: false`: the container polls the
 // players itself, faster while they play (src/hub.js), the core scheduler only
 // knows fixed paces and does not poll reliably (GladysAssistant/Gladys#3198).
 // -----------------------------------------------------------------------------
 
-import { DEVICE_FEATURE_CATEGORIES, DEVICE_FEATURE_TYPES } from '@gladysassistant/integration-sdk';
+import {
+  DEVICE_FEATURE_CATEGORIES,
+  DEVICE_FEATURE_TYPES,
+  DEVICE_FEATURE_UNITS,
+  MUSIC_PLAYBACK_STATE,
+} from '@gladysassistant/integration-sdk';
 import { NAMES, sourceLabel, textsOf } from './i18n.js';
 
 /** The device type in the external ids: `ext:<selector>:player:<uuid>`. */
@@ -37,6 +46,27 @@ export const FEATURES = {
   EQUALIZER: 'equalizer',
   GROUP: 'group',
   NOTIFICATION: 'notification',
+  // 1.1.0 (Gladys 5.3)
+  ARTWORK: 'artwork',
+  DURATION: 'duration',
+  POSITION: 'position',
+  SHUFFLE: 'shuffle',
+  REPEAT: 'repeat',
+};
+
+/** Feature key → music type, for publishNowPlaying (featureExternalIds). */
+export const MUSIC_KEYS = {
+  playback_state: 'playback-state',
+  title: 'title',
+  artist: 'artist',
+  album: 'album',
+  artwork: 'artwork',
+  duration: 'duration',
+  position: 'position',
+  shuffle: 'shuffle',
+  repeat: 'repeat',
+  mute: 'mute',
+  volume: 'volume',
 };
 
 /** The equalizer option that turns it off. */
@@ -49,16 +79,16 @@ export const EQUALIZER_OFF_LABEL = {
   es: 'Desactivado',
 };
 
-// MUSIC_PLAYBACK_STATE of the core: 1 playing, 0 anything else.
-export const PLAYBACK_STATE = { PLAYING: 1, NOT_PLAYING: 0 };
-
-// A text state is never empty, or the core ignores it.
-export const EMPTY_TEXT = '—';
+// MUSIC_PLAYBACK_STATE of the core: 0 paused, 1 playing, 2 idle, 3 buffering.
+export const PLAYBACK_STATE = MUSIC_PLAYBACK_STATE;
 
 const { MUSIC, TELEVISION, TEXT } = DEVICE_FEATURE_CATEGORIES;
 const TYPES = DEVICE_FEATURE_TYPES;
+// Bound of the duration and the position (24 h: a long mix, an audiobook).
+const LONG = 24 * 60 * 60;
+const { SECONDS } = DEVICE_FEATURE_UNITS;
 
-// key → [category, type, read_only, min, max, keep_history, has_feedback]
+// key → [category, type, read_only, min, max, keep_history, has_feedback, unit]
 const DEFINITIONS = {
   [FEATURES.PLAY]: [MUSIC, TYPES.MUSIC.PLAY, false, 0, 1, false, false],
   [FEATURES.PAUSE]: [MUSIC, TYPES.MUSIC.PAUSE, false, 0, 1, false, false],
@@ -66,11 +96,16 @@ const DEFINITIONS = {
   [FEATURES.PREVIOUS]: [MUSIC, TYPES.MUSIC.PREVIOUS, false, 0, 1, false, false],
   [FEATURES.NEXT]: [MUSIC, TYPES.MUSIC.NEXT, false, 0, 1, false, false],
   [FEATURES.VOLUME]: [MUSIC, TYPES.MUSIC.VOLUME, false, 0, 100, false, true],
-  [FEATURES.MUTE]: [TELEVISION, TYPES.TELEVISION.VOLUME_MUTE, false, 0, 1, false, false],
-  [FEATURES.PLAYBACK_STATE]: [MUSIC, TYPES.MUSIC.PLAYBACK_STATE, true, 0, 1, true, false],
-  [FEATURES.TITLE]: [TEXT, TYPES.TEXT.TEXT, true, 0, 0, false, false],
-  [FEATURES.ARTIST]: [TEXT, TYPES.TEXT.TEXT, true, 0, 0, false, false],
-  [FEATURES.ALBUM]: [TEXT, TYPES.TEXT.TEXT, true, 0, 0, false, false],
+  [FEATURES.MUTE]: [MUSIC, TYPES.MUSIC.MUTE, false, 0, 1, false, true],
+  [FEATURES.PLAYBACK_STATE]: [MUSIC, TYPES.MUSIC.PLAYBACK_STATE, false, 0, 2, false, true],
+  [FEATURES.TITLE]: [MUSIC, TYPES.MUSIC.TITLE, true, 0, 0, false, false],
+  [FEATURES.ARTIST]: [MUSIC, TYPES.MUSIC.ARTIST, true, 0, 0, false, false],
+  [FEATURES.ALBUM]: [MUSIC, TYPES.MUSIC.ALBUM, true, 0, 0, false, false],
+  [FEATURES.ARTWORK]: [MUSIC, TYPES.MUSIC.ARTWORK, true, 0, 0, false, false],
+  [FEATURES.DURATION]: [MUSIC, TYPES.MUSIC.DURATION, true, 0, LONG, false, false, SECONDS],
+  [FEATURES.POSITION]: [MUSIC, TYPES.MUSIC.POSITION, false, 0, LONG, false, true, SECONDS],
+  [FEATURES.SHUFFLE]: [MUSIC, TYPES.MUSIC.SHUFFLE, false, 0, 1, false, true],
+  [FEATURES.REPEAT]: [MUSIC, TYPES.MUSIC.REPEAT, false, 0, 2, false, true],
   [FEATURES.SOURCE]: [TEXT, TYPES.TEXT.SELECT, false, 0, 0, false, true],
   [FEATURES.EQUALIZER]: [TEXT, TYPES.TEXT.SELECT, false, 0, 0, false, false],
   [FEATURES.GROUP]: [TEXT, TYPES.TEXT.TEXT, true, 0, 0, false, false],
@@ -126,7 +161,7 @@ export function buildDevice(gladys, info, config) {
       { name: 'FIRMWARE', value: info.firmware || '?' },
     ],
     features: featureKeys(info).map((key) => {
-      const [category, type, readOnly, min, max, keepHistory, hasFeedback] = DEFINITIONS[key];
+      const [category, type, readOnly, min, max, keepHistory, hasFeedback, unit] = DEFINITIONS[key];
       const feature = {
         name: names[key],
         external_id: ids.feature(key),
@@ -138,6 +173,9 @@ export function buildDevice(gladys, info, config) {
         min,
         max,
       };
+      if (unit) {
+        feature.unit = unit;
+      }
       const options = supportedOptions(key, info, config.language);
       if (options) {
         feature.supported_options = options;
