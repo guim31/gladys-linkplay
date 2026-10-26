@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-26
+
 ### Fixed
 
 - The container no longer crashes at startup: the JPEG encoder used to resize
@@ -66,6 +68,7 @@ the notes of the version's GitHub Release.
 - Feature names, sources and messages in English, French, German and
   Spanish; documentation in the four languages.
 
-[Unreleased]: https://github.com/guim31/gladys-linkplay/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/guim31/gladys-linkplay/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/guim31/gladys-linkplay/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/guim31/gladys-linkplay/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/guim31/gladys-linkplay/releases/tag/v1.0.1
