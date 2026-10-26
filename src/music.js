@@ -31,12 +31,15 @@ const STATES = {
 /**
  * The now playing of a player, for publishNowPlaying. Titles and artwork are
  * what the player reports, empty when it reports none (a player that stops
- * often keeps the track loaded); a live stream has no duration and no
- * position.
+ * often keeps the track loaded). A live stream has no duration; its position
+ * is the time since it started (`elapsed`) when the player does not count
+ * it: a 0 published while playing would be republished at every reading, the
+ * SDK extrapolating it without a duration to stop at.
  * @param {object} snapshot Player.snapshot
  * @param {object | null} info Player.info
+ * @param {number} [elapsed] seconds since this track or stream started
  */
-export function nowPlayingOf(snapshot, info) {
+export function nowPlayingOf(snapshot, info, elapsed = 0) {
   const live = snapshot.duration === 0;
   const nowPlaying = {
     playback_state: STATES[snapshot.playback] ?? PLAYBACK_STATE.IDLE,
@@ -45,7 +48,7 @@ export function nowPlayingOf(snapshot, info) {
     album: snapshot.album,
     artwork_url: snapshot.artworkUrl ?? null,
     duration: snapshot.duration,
-    position: live ? 0 : Math.min(snapshot.position, snapshot.duration),
+    position: live ? snapshot.position || elapsed : Math.min(snapshot.position, snapshot.duration),
     mute: snapshot.muted,
   };
   if (snapshot.volume !== null) {

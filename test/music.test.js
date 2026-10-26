@@ -451,3 +451,23 @@ test('review fixes: a slow player is read back until it shows the mode; unsafe c
   );
   await assert.rejects(downloadArtwork('http://127.0.0.1/a.jpg', { get: network.get }), /local/);
 });
+
+test('a live stream: its position counts from its start, not republished at every reading', async () => {
+  const env = await setup();
+  // WiiM Pro on a web radio (titles from getMetaInfo, totlen 0, curpos 0).
+  assert.equal(music(env, SALON).duration, 0);
+  const position = env.idOf(SALON, 'position');
+  const sent = () =>
+    env.gladys.fake.states.filter((s) => s.device_feature_external_id === position).length;
+  const before = sent();
+  for (let i = 0; i < 4; i += 1) {
+    env.clock.now += 5000;
+    await poll(env, SALON);
+  }
+  assert.equal(sent(), before, 'the dashboard extrapolates it');
+  // Every 6 hours, the whole state again (publishNowPlaying has no heartbeat).
+  const states = env.gladys.fake.states.length;
+  env.clock.now += 6 * 60 * 60 * 1000;
+  await poll(env, SALON);
+  assert.ok(env.gladys.fake.states.length - states >= 10);
+});

@@ -478,13 +478,27 @@ export class LinkPlayHub {
       return;
     }
     const ids = this.gladys.externalIds(DEVICE_TYPE, player.uuid);
+    const snapshot = player.snapshot;
+    const track = [snapshot.source, snapshot.title, snapshot.artist, snapshot.album].join('|');
+    if (player.track !== track) {
+      // The real clock, the one the SDK extrapolates the position with.
+      player.track = track;
+      player.trackStart = Date.now();
+    }
+    // publishNowPlaying has no heartbeat: everything again every 6 hours.
+    if (player.forgottenAt === undefined) {
+      player.forgottenAt = this.now();
+    } else if (this.now() - player.forgottenAt >= this.timings.heartbeat) {
+      player.forgottenAt = this.now();
+      this.gladys.forgetPublishedStates(ids.device);
+    }
     try {
       const featureExternalIds = Object.fromEntries(
         Object.entries(MUSIC_KEYS).map(([type, key]) => [type, ids.feature(key)]),
       );
       const { count: music } = await this.gladys.publishNowPlaying(
         ids.device,
-        nowPlayingOf(player.snapshot, player.info),
+        nowPlayingOf(snapshot, player.info, Math.floor((Date.now() - player.trackStart) / 1000)),
         { featureExternalIds },
       );
       const states = this.statesOf(player, device);
