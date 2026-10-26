@@ -197,6 +197,56 @@ export function parseDeviceStatus(raw) {
   };
 }
 
+// `loop` of the player status → shuffle and repeat. Values 0 to 4 read the
+// same on every documented firmware (Arylic HTTP API; WiiM HTTP API; pywiim
+// and rustywiim, checked on WiiM, Audio Pro, iEAST and Arylic players). 5 is
+// shuffle + repeat one on the Arylic table, repeat one for Spotify on a WiiM;
+// -1 is the "sequence, no loop" of the original LinkPlay API.
+export const REPEAT = { OFF: 0, ALL: 1, ONE: 2 };
+const LOOPS = {
+  '-1': { shuffle: false, repeat: REPEAT.OFF },
+  0: { shuffle: false, repeat: REPEAT.ALL },
+  1: { shuffle: false, repeat: REPEAT.ONE },
+  2: { shuffle: true, repeat: REPEAT.ALL },
+  3: { shuffle: true, repeat: REPEAT.OFF },
+  4: { shuffle: false, repeat: REPEAT.OFF },
+  5: { shuffle: true, repeat: REPEAT.ONE },
+};
+
+/**
+ * Shuffle and repeat of a `loop` value, null when unknown.
+ * @param {unknown} loop
+ * @param {{ wiim?: boolean, source?: string }} [context]
+ */
+export function decodeLoop(loop, { wiim = false, source } = {}) {
+  const key = String(loop ?? '').trim();
+  if (key === '5' && wiim && source === 'spotify') {
+    return { shuffle: false, repeat: REPEAT.ONE };
+  }
+  return Object.hasOwn(LOOPS, key) ? { ...LOOPS[key] } : null;
+}
+
+/**
+ * The `loopmode` values that ask for a shuffle and repeat combination, in the
+ * order to try them. Current firmwares take the table they report (0 to 5);
+ * the WiiM HTTP API documents an older one for writing (-1 all, 0 off, 1 one,
+ * 2 shuffle + all), which some units follow: tried second, when it has the
+ * combination.
+ */
+export function loopModesFor(shuffle, repeat) {
+  const reported = Object.entries(LOOPS)
+    .filter(([key, loop]) => key !== '-1' && loop.shuffle === shuffle && loop.repeat === repeat)
+    .map(([key]) => Number(key));
+  const legacy = { 'false:0': 0, 'false:1': -1, 'false:2': 1, 'true:1': 2 }[`${shuffle}:${repeat}`];
+  return legacy === undefined ? reported : [...reported, legacy];
+}
+
+/** Milliseconds (a status text) → whole seconds, 0 when absent. */
+function seconds(value) {
+  const ms = Number.parseInt(String(value ?? ''), 10);
+  return Number.isFinite(ms) && ms > 0 ? Math.floor(ms / 1000) : 0;
+}
+
 /**
  * The playback, from `getPlayerStatusEx` (or `getPlayerStatus`).
  * @param {object} raw
@@ -217,6 +267,11 @@ export function parsePlayerStatus(raw) {
     title: decodeText(raw.Title),
     artist: decodeText(raw.Artist),
     album: decodeText(raw.Album),
+    // curpos / totlen are milliseconds; totlen is 0 for a live stream.
+    duration: seconds(raw.totlen),
+    position: seconds(raw.curpos),
+    loop: String(raw.loop ?? ''),
+    artworkUrl: null,
   };
 }
 
@@ -236,17 +291,33 @@ export function parseFollowers(raw) {
 }
 
 /**
- * The WiiM metadata (`getMetaInfo`), plain texts, used when the player
- * status gives none.
- * @param {object} raw `{ metaData: { title, artist, album } }`
+ * The WiiM metadata (`getMetaInfo`), plain texts: the artwork URL (the HTTP
+ * API has no other), and the titles when the player status gives none.
+ * @param {object} raw `{ metaData: { title, artist, album, albumArtURI } }`
  */
 export function parseMetaInfo(raw) {
   const meta = raw?.metaData ?? {};
-  return {
-    title: decodeText(meta.title),
-    artist: decodeText(meta.artist),
-    album: decodeText(meta.album),
+  // "unknow" (sic): the placeholder of getMetaInfo (python-linkplay#137).
+  const text = (value) => {
+    const decoded = decodeText(value);
+    return /^unknow$/i.test(decoded) ? '' : decoded;
   };
+  return {
+    title: text(meta.title),
+    artist: text(meta.artist),
+    album: text(meta.album),
+    artworkUrl: httpUrl(text(meta.albumArtURI)),
+  };
+}
+
+/** An http(s) URL, else null. */
+function httpUrl(text) {
+  try {
+    const url = new URL(text);
+    return ['http:', 'https:'].includes(url.protocol) && url.hostname ? url.href : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -263,6 +334,25 @@ export function parsePresetInfo(raw) {
     }
   }
   return names;
+}
+
+/**
+ * What the music panel shows of the WiiM presets (`getPresetInfo`): whether a
+ * preset is a radio (TuneIn and the like) and its picture URL.
+ * @returns {Map<number, { radio: boolean, artworkUrl: string | null }>}
+ */
+export function parsePresetExtras(raw) {
+  const extras = new Map();
+  for (const entry of Array.isArray(raw?.preset_list) ? raw.preset_list : []) {
+    const number = Number(entry?.number);
+    if (Number.isInteger(number) && number >= 1) {
+      extras.set(number, {
+        radio: /tunein|radio|iheart|vtuner/i.test(String(entry?.source ?? '')),
+        artworkUrl: httpUrl(decodeText(entry?.picurl)),
+      });
+    }
+  }
+  return extras;
 }
 
 /** The WiiM equalizer presets (`EQGetList`): an array of names. */

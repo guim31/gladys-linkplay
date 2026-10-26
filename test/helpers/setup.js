@@ -79,6 +79,7 @@ export const SCAN_RESULTS = {
  * @param {boolean} [options.timers]
  * @param {(gladys) => void} [options.prepare] called before connect()
  * @param {boolean} [options.realTime] the real clock instead of the manual one
+ * @param {Function} [options.artworkGet] transport of the artwork downloads
  */
 export async function setup({
   players = defaultPlayers(),
@@ -89,6 +90,7 @@ export async function setup({
   timers = false,
   prepare,
   realTime = false,
+  artworkGet,
 } = {}) {
   const network = fakeNetwork(players);
   const clock = { now: 1_000_000 };
@@ -98,6 +100,8 @@ export async function setup({
     timers,
     timings,
     now: realTime ? () => Date.now() : () => clock.now,
+    wait: async () => {},
+    artworkGet,
   });
   prepare?.(gladys);
   await gladys.connect();

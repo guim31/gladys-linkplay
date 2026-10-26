@@ -17,8 +17,8 @@ import { createLogger } from '@gladysassistant/integration-sdk';
 import { normalizeConfig } from './config.js';
 import {
   DEVICE_TYPE,
-  EMPTY_TEXT,
   FEATURES,
+  MUSIC_KEYS,
   PLAYBACK_STATE,
   buildDevice,
   featureKeyOf,
@@ -31,7 +31,8 @@ import { createIssueLog } from './issues.js';
 import { parseAddress } from './linkplay/client.js';
 import { LinkPlayError } from './linkplay/http.js';
 import { displayModel } from './linkplay/models.js';
-import { PLAYBACK } from './linkplay/status.js';
+import { PLAYBACK, REPEAT, decodeLoop } from './linkplay/status.js';
+import { nowPlayingOf, presetItems, presetNumberOf } from './music.js';
 import { Player, loggableUrl, playableUrl } from './player.js';
 
 const logger = createLogger({ name: 'linkplay' });
@@ -61,6 +62,26 @@ const LOST_AFTER = 2;
 export const WIDGET_KEY = 'player';
 export const SCENE_TRIGGER_KEYS = ['source_changed'];
 
+/** A binary state written (0/1, booleans); throws a user message otherwise. */
+function binary(value, texts) {
+  if (value === true || value === 1 || value === '1') {
+    return true;
+  }
+  if (value === false || value === 0 || value === '0') {
+    return false;
+  }
+  throw new Error(texts.invalidValue);
+}
+
+/** A MUSIC_REPEAT_MODE written; throws a user message otherwise. */
+function repeatOf(value, texts) {
+  const repeat = Number(value);
+  if (!Object.values(REPEAT).includes(repeat)) {
+    throw new Error(texts.invalidValue);
+  }
+  return repeat;
+}
+
 const isActive = (snapshot) =>
   snapshot?.playback === PLAYBACK.PLAYING || snapshot?.playback === PLAYBACK.LOADING;
 
@@ -72,13 +93,16 @@ export class LinkPlayHub {
    * @param {boolean} [options.timers] run the polling timer (tests may drive it)
    * @param {object} [options.timings] overrides of TIMINGS
    * @param {() => number} [options.now]
+   * @param {(ms: number) => Promise<void>} [options.wait]
    */
-  constructor({ gladys, get, timers = true, timings = {}, now = () => Date.now() }) {
+  constructor({ gladys, get, timers = true, timings = {}, now = () => Date.now(), wait }) {
     this.gladys = gladys;
     this.get = get;
     this.timers = timers;
     this.timings = { ...TIMINGS, ...timings };
     this.now = now;
+    /** Waits between an order and its check (loop modes); immediate in tests. */
+    this.wait = wait ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.config = normalizeConfig();
     /** @type {Map<string, Player>} by uuid */
     this.players = new Map();
@@ -149,13 +173,22 @@ export class LinkPlayHub {
     return player;
   }
 
+  /** Whether a host name is the address of a known player. */
+  isPlayerHost(host) {
+    return [...this.players.values()].some(
+      (player) => player.client.hostname === host || player.ip === host,
+    );
+  }
+
   nameOf(player) {
     return player.info?.name ?? player.label ?? player.address;
   }
 
   /** The presets of a player: number and name (WiiM), 1 to its preset count. */
   presetsOf(player) {
-    const count = player.info?.presetCount ?? 6;
+    // A WiiM may name more presets than its preset_key says.
+    const named = [...(player.info?.presetNames?.keys() ?? [])];
+    const count = Math.max(player.info?.presetCount ?? 6, ...named);
     return Array.from({ length: count }, (_, index) => ({
       number: index + 1,
       name: player.info?.presetNames?.get(index + 1) ?? null,
@@ -365,10 +398,16 @@ export class LinkPlayHub {
       player.nextPollAt = this.now() + this.cadence(player);
       return;
     }
-    if (player.followUps > 0) {
+    const following = player.followUps > 0;
+    if (following) {
       player.followUps -= 1;
     }
     await this.#followAnnouncement(player);
+    if (following) {
+      // After an order, the whole state again, even unchanged: the dashboard
+      // shows the order's effect until a state confirms or contradicts it.
+      this.gladys.forgetPublishedStates(this.gladys.externalIds(DEVICE_TYPE, player.uuid).device);
+    }
     await this.publishStates(player);
     this.#fireTriggers(player, previous);
     this.#refreshWidget(player, previous);
@@ -405,7 +444,10 @@ export class LinkPlayHub {
     return texts.alone;
   }
 
-  /** The states of a player, for the features its Gladys device has. */
+  /**
+   * The text states of a player (source, equalizer, group), for the features
+   * its Gladys device has. The music features go through publishNowPlaying.
+   */
   statesOf(player, device) {
     const snapshot = player.snapshot;
     if (!snapshot) {
@@ -413,43 +455,59 @@ export class LinkPlayHub {
     }
     const ids = this.gladys.externalIds(DEVICE_TYPE, player.uuid);
     const states = [
-      [
-        FEATURES.PLAYBACK_STATE,
-        isActive(snapshot) ? PLAYBACK_STATE.PLAYING : PLAYBACK_STATE.NOT_PLAYING,
-      ],
-      [FEATURES.VOLUME, snapshot.volume],
-      [FEATURES.TITLE, { text: snapshot.title || EMPTY_TEXT }],
-      [FEATURES.ARTIST, { text: snapshot.artist || EMPTY_TEXT }],
-      [FEATURES.ALBUM, { text: snapshot.album || EMPTY_TEXT }],
-      [FEATURES.SOURCE, snapshot.input ? { text: snapshot.input } : null],
-      [FEATURES.EQUALIZER, snapshot.equalizer ? { text: snapshot.equalizer } : null],
-      [FEATURES.GROUP, { text: this.groupText(player) }],
+      [FEATURES.SOURCE, snapshot.input],
+      [FEATURES.EQUALIZER, snapshot.equalizer],
+      [FEATURES.GROUP, this.groupText(player)],
     ];
     const existing = new Set((device?.features ?? []).map((feature) => feature.external_id));
     return states
-      .filter(
-        ([key, value]) => value !== null && value !== undefined && existing.has(ids.feature(key)),
-      )
-      .map(([key, value]) =>
-        typeof value === 'object'
-          ? { device_feature_external_id: ids.feature(key), text: value.text }
-          : { device_feature_external_id: ids.feature(key), state: value },
-      );
+      .filter(([key, text]) => text && existing.has(ids.feature(key)))
+      .map(([key, text]) => ({ device_feature_external_id: ids.feature(key), text }));
   }
 
-  /** Publish what changed (and, every 6 hours, what did not). */
+  /**
+   * Publish what changed (and, every 6 hours, the texts that did not). The
+   * music features are diffed by publishNowPlaying (no heartbeat needed: the
+   * dashboard never says "no recent value" for them). Published even before
+   * the user clicks "Update" on a 1.0 device: Gladys ignores the features it
+   * does not have yet, and the SDK publishes everything again after the update.
+   */
   async publishStates(player) {
     const device = this.createdDevices().get(player.uuid);
-    const states = this.statesOf(player, device);
-    if (states.length === 0) {
+    if (!device || !player.snapshot) {
       return;
     }
+    const ids = this.gladys.externalIds(DEVICE_TYPE, player.uuid);
+    const snapshot = player.snapshot;
+    const track = [snapshot.source, snapshot.title, snapshot.artist, snapshot.album].join('|');
+    if (player.track !== track) {
+      // The real clock, the one the SDK extrapolates the position with.
+      player.track = track;
+      player.trackStart = Date.now();
+    }
+    // publishNowPlaying has no heartbeat: everything again every 6 hours.
+    if (player.forgottenAt === undefined) {
+      player.forgottenAt = this.now();
+    } else if (this.now() - player.forgottenAt >= this.timings.heartbeat) {
+      player.forgottenAt = this.now();
+      this.gladys.forgetPublishedStates(ids.device);
+    }
     try {
-      const { count } = await this.gladys.publishChangedStates(states, {
-        heartbeat: this.timings.heartbeat,
-      });
-      if (count > 0) {
-        logger.debug(`${this.nameOf(player)}: ${count} state(s) published`);
+      const featureExternalIds = Object.fromEntries(
+        Object.entries(MUSIC_KEYS).map(([type, key]) => [type, ids.feature(key)]),
+      );
+      const { count: music } = await this.gladys.publishNowPlaying(
+        ids.device,
+        nowPlayingOf(snapshot, player.info, Math.floor((Date.now() - player.trackStart) / 1000)),
+        { featureExternalIds },
+      );
+      const states = this.statesOf(player, device);
+      const { count } =
+        states.length > 0
+          ? await this.gladys.publishChangedStates(states, { heartbeat: this.timings.heartbeat })
+          : { count: 0 };
+      if (music + count > 0) {
+        logger.debug(`${this.nameOf(player)}: ${music + count} state(s) published`);
       }
       this.issues.ok('states', 'Gladys accepts the states again');
     } catch (err) {
@@ -580,11 +638,19 @@ export class LinkPlayHub {
   /** The core's commands on the features (onSetValue). Resolves nothing. */
   async setValue(device, feature, value) {
     const player = this.playerOf(device.external_id);
-    await this.#command(player, featureKeyOf(feature.external_id), value);
+    await this.#command(player, featureKeyOf(feature.external_id), value, feature);
   }
 
-  #command(player, key, value) {
+  #command(player, key, value, feature) {
     switch (key) {
+      case FEATURES.PLAYBACK_STATE:
+        return this.setPlaybackState(player, value);
+      case FEATURES.POSITION:
+        return this.seek(player, value);
+      case FEATURES.SHUFFLE:
+        return this.setLoop(player, { shuffle: binary(value, this.texts) });
+      case FEATURES.REPEAT:
+        return this.setLoop(player, { repeat: repeatOf(value, this.texts) });
       case FEATURES.PLAY:
         return this.order(player, 'play', () => player.play());
       case FEATURES.PAUSE:
@@ -598,7 +664,11 @@ export class LinkPlayHub {
       case FEATURES.VOLUME:
         return this.setVolume(player, value);
       case FEATURES.MUTE:
-        return this.order(player, 'mute on/off', () => player.toggleMute());
+        // A 1.0 device not updated yet: the television push button toggles.
+        if (feature?.category === 'television') {
+          return this.order(player, 'mute on/off', () => player.toggleMute());
+        }
+        return this.setMute(player, binary(value, this.texts));
       case FEATURES.SOURCE:
         return this.setSource(player, String(value));
       case FEATURES.EQUALIZER:
@@ -608,6 +678,80 @@ export class LinkPlayHub {
       default:
         throw new Error(this.texts.unsupported(this.nameOf(player)));
     }
+  }
+
+  /** playback_state written: 0 pause, 1 play, 2 stop (3, buffering, is refused by the core). */
+  async setPlaybackState(player, value) {
+    const state = Number(value);
+    if (state === PLAYBACK_STATE.PAUSED) {
+      return this.order(player, 'pause', () => player.pause());
+    }
+    if (state === PLAYBACK_STATE.PLAYING) {
+      return this.order(player, 'play', () => player.play());
+    }
+    if (state === PLAYBACK_STATE.IDLE) {
+      return this.order(player, 'stop', () => player.stop());
+    }
+    throw new Error(this.texts.invalidValue);
+  }
+
+  async setMute(player, muted) {
+    await this.order(player, muted ? 'mute' : 'unmute', () => player.setMute(muted));
+  }
+
+  /** position written: a seek, within a track that has a length. */
+  async seek(player, value) {
+    const position = Math.round(Number(value));
+    if (!Number.isFinite(position) || position < 0) {
+      throw new Error(this.texts.invalidValue);
+    }
+    const duration = player.snapshot?.duration ?? 0;
+    if (duration === 0) {
+      throw new Error(this.texts.notSeekable(this.nameOf(player)));
+    }
+    const target = Math.min(position, duration);
+    await this.order(player, `seek ${target} s`, () => player.seek(target));
+  }
+
+  /** shuffle or repeat written: the other one is kept as the player reports it. */
+  async setLoop(player, change) {
+    const current = decodeLoop(player.snapshot?.loop, {
+      wiim: player.info?.wiim,
+      source: player.snapshot?.source,
+    }) ?? { shuffle: false, repeat: REPEAT.OFF };
+    const { shuffle, repeat } = { ...current, ...change };
+    const done = await this.order(
+      player,
+      `shuffle ${shuffle ? 'on' : 'off'}, repeat ${repeat}`,
+      () => player.setLoop(shuffle, repeat, this.wait),
+    );
+    if (!done) {
+      logger.debug(`${this.nameOf(player)}: shuffle and repeat unchanged by the player`);
+      throw new Error(this.texts.loopRefused(this.nameOf(player)));
+    }
+  }
+
+  // --- Music panel (presets) and media -----------------------------------------------
+
+  /** onMusicBrowse: the presets, at the root (nothing below). */
+  browse(device, { parentId, offset = 0, limit = 100 } = {}) {
+    const player = this.playerOf(device.external_id);
+    if (parentId !== null && parentId !== undefined) {
+      return { items: [], total: 0 };
+    }
+    const presets = this.presetsOf(player);
+    const items = presetItems(this.gladys, presets, player.info, this.config.language);
+    return { items: items.slice(offset, offset + limit), total: items.length };
+  }
+
+  /** onMusicPlay: a preset (the only media the catalog hands out). */
+  async playMedia(device, media) {
+    const player = this.playerOf(device.external_id);
+    const number = presetNumberOf(media?.id);
+    if (number === null) {
+      throw new Error(this.texts.invalidValue);
+    }
+    await this.playPreset(player, number);
   }
 
   async setVolume(player, value) {
@@ -635,7 +779,7 @@ export class LinkPlayHub {
   }
 
   async playPreset(player, preset) {
-    const max = player.info?.presetCount ?? 6;
+    const max = this.presetsOf(player).length;
     const number = Number(preset);
     if (!Number.isInteger(number) || number < 1 || number > max) {
       throw new Error(this.texts.invalidPreset(max));

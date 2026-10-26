@@ -68,15 +68,15 @@ Cada reproductor es un dispositivo de Gladys, con el nombre de su aplicación.
 
 ### Reproducción y volumen
 
-| Función                | Tipo                     | Qué hace                                                  |
-| ---------------------- | ------------------------ | --------------------------------------------------------- |
-| Reproducir             | music / play             | Reanuda la reproducción                                   |
-| Pausa                  | music / pause            | Pone en pausa                                             |
-| Detener                | television / stop        | Detiene (un botón en la tarjeta de la habitación)         |
-| Anterior, Siguiente    | music / previous, next   | Pista anterior o siguiente                                |
-| Volumen                | music / volume (0-100)   | Lee y ajusta el volumen                                   |
-| Silenciar              | television / volume-mute | Silencia, o devuelve el sonido si está silenciado (botón) |
-| Estado de reproducción | music / playback_state   | 1 durante la reproducción, 0 si no (en el historial)      |
+| Función                | Tipo                   | Qué hace                                                                           |
+| ---------------------- | ---------------------- | ---------------------------------------------------------------------------------- |
+| Reproducir             | music / play           | Reanuda la reproducción                                                            |
+| Pausa                  | music / pause          | Pone en pausa                                                                      |
+| Detener                | television / stop      | Detiene (un botón en la tarjeta de la habitación)                                  |
+| Anterior, Siguiente    | music / previous, next | Pista anterior o siguiente                                                         |
+| Volumen                | music / volume (0-100) | Lee y ajusta el volumen                                                            |
+| Silenciar              | music / mute           | Silencia o devuelve el sonido (un conmutador antes de «Actualizar», vea más abajo) |
+| Estado de reproducción | music / playback_state | 1 reproducción, 0 pausa, 2 detenido, 3 cargando; escribible (0, 1, 2)              |
 
 El widget Música del panel de Gladys utiliza estas funciones.
 
@@ -93,8 +93,8 @@ El widget Música del panel de Gladys utiliza estas funciones.
 
 ### Títulos y grupo
 
-- **Título**, **Artista**, **Álbum**: lo que suena; «—» cuando la fuente no
-  da nada (una entrada, un reproductor que sigue a un grupo).
+- **Título**, **Artista**, **Álbum**: lo que suena; vacíos cuando la fuente
+  no dice nada (una entrada, un reproductor que sigue a un grupo).
 - **Grupo multiroom**: «Sin agrupar», «Dirige: Cocina, Dormitorio» o «Sigue
   a: Salón».
 
@@ -107,6 +107,37 @@ sonaba una entrada (TV, línea...), el reproductor vuelve a ella después; un
 flujo de red (Spotify, una radio web) no se reinicia — vuelva a lanzarlo con un
 preajuste en la siguiente acción de la escena. Gladys no transmite el volumen
 de la acción a la integración.
+
+## Reproductor de música de Gladys 5.3
+
+Desde Gladys 5.3, la caja **Música** del panel es un verdadero reproductor.
+Para cada reproductor LinkPlay muestra:
+
+- la **carátula** (WiiM y firmwares recientes que la dan; una grande, de
+  AirPlay o de un servidor Plex, la reduce la integración a 400 píxeles), el
+  título, el artista y el álbum;
+- una **barra de progreso** que puede arrastrar para moverse en la pista (no
+  en una radio ni en una entrada, que no tienen duración);
+- reproducir, pausa, detener, anterior, siguiente, **aleatorio**,
+  **repetición** (desactivada, todo, una pista), **silenciar** y volumen;
+- el botón de navegación abre los **preajustes** del reproductor (con nombre
+  en un WiiM, numerados en otros): un toque reproduce uno. La acción de escena
+  **Reproducir música en un altavoz** también los ofrece.
+
+Aleatorio y repetición siguen la fuente en uso: Spotify Connect, AirPlay o
+Tidal Connect pueden conservar sus propios ajustes, y Gladys lo indica
+entonces. No todos los firmwares escriben estos modos con los mismos valores:
+la integración comprueba la respuesta del reproductor y conserva el que
+funciona.
+
+**Un reproductor añadido antes de la versión 1.1.0** sigue funcionando como
+antes: abra la pestaña **Descubrir** de la integración y haga clic en
+**Actualizar** en el reproductor. Se añaden carátula, duración, posición,
+aleatorio y repetición; Título, Artista, Álbum y Silenciar pasan a ser
+funciones de música con los mismos identificadores (se conservan escenas y
+paneles). **Estado de reproducción** cambia: vale 2 (ya no 0) cuando el
+reproductor está detenido, y ya no se guarda en el historial (Gladys no guarda
+historial de las funciones de música).
 
 ## Widget
 
@@ -175,7 +206,7 @@ encuentra sola).
   autofirmado del reproductor) y luego HTTP (puerto 80).
 - **Falta una fuente en la lista**: el reproductor no la declara; indíquenos
   su modelo.
-- **Los títulos muestran «—»**: la fuente no da títulos (una entrada, algunos
+- **Los títulos están vacíos**: la fuente no da títulos (una entrada, algunos
   servicios).
 - **Más detalles**: ponga la variable `LOG_LEVEL` de la integración en
   `debug`; los registros nunca muestran entera la dirección de un anuncio.
@@ -189,8 +220,9 @@ encuentra sola).
   con un certificado de cliente aún no son compatibles.
 - Los nombres de los preajustes solo vienen de los WiiM; en los demás, los
   preajustes van numerados.
-- Sin avance, aleatorio ni repetición, ni exploración de una biblioteca
-  musical: eso lo hace la integración DLNA.
+- Sin búsqueda, cola ni biblioteca musical (la API LinkPlay no las tiene):
+  eso lo hace la integración DLNA. Sin carátula en los firmwares sin
+  `getMetaInfo` (WiiM y algunos recientes lo tienen).
 - Un reproductor que sigue a un grupo no muestra títulos; el volumen de un
   grupo entero no se gestiona (cada reproductor conserva el suyo).
 - El estado del ecualizador es desconocido cuando se cambia desde la

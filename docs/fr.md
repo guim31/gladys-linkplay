@@ -67,15 +67,15 @@ Chaque lecteur est un appareil Gladys, nommé comme dans son application.
 
 ### Lecture et volume
 
-| Fonctionnalité     | Type                     | Ce qu'elle fait                                         |
-| ------------------ | ------------------------ | ------------------------------------------------------- |
-| Lecture            | music / play             | Reprend la lecture                                      |
-| Pause              | music / pause            | Met en pause                                            |
-| Stop               | television / stop        | Arrête (un bouton dans la carte de la pièce)            |
-| Précédent, Suivant | music / previous, next   | Piste précédente ou suivante                            |
-| Volume             | music / volume (0-100)   | Lit et règle le volume                                  |
-| Sourdine           | television / volume-mute | Coupe le son, ou le remet s'il est coupé (un bouton)    |
-| État de lecture    | music / playback_state   | 1 pendant la lecture, 0 sinon (gardé dans l'historique) |
+| Fonctionnalité     | Type                   | Ce qu'elle fait                                                            |
+| ------------------ | ---------------------- | -------------------------------------------------------------------------- |
+| Lecture            | music / play           | Reprend la lecture                                                         |
+| Pause              | music / pause          | Met en pause                                                               |
+| Stop               | television / stop      | Arrête (un bouton dans la carte de la pièce)                               |
+| Précédent, Suivant | music / previous, next | Piste précédente ou suivante                                               |
+| Volume             | music / volume (0-100) | Lit et règle le volume                                                     |
+| Sourdine           | music / mute           | Coupe ou remet le son (une bascule avant « Mettre à jour », voir plus bas) |
+| État de lecture    | music / playback_state | 1 lecture, 0 pause, 2 arrêté, 3 chargement ; s'écrit (0, 1, 2)             |
 
 Le widget Musique du tableau de bord de Gladys utilise ces fonctionnalités.
 
@@ -92,7 +92,7 @@ Le widget Musique du tableau de bord de Gladys utilise ces fonctionnalités.
 
 ### Titres et groupe
 
-- **Titre**, **Artiste**, **Album** : ce qui joue ; « — » quand la source ne
+- **Titre**, **Artiste**, **Album** : ce qui joue ; vides quand la source ne
   dit rien (une entrée, un lecteur qui suit un groupe).
 - **Groupe multiroom** : « Non groupé », « Maître de : Cuisine, Chambre » ou
   « Suit : Salon ».
@@ -106,6 +106,36 @@ musique : si une entrée (TV, ligne...) jouait, le lecteur y revient ensuite ;
 un flux réseau (Spotify, une radio web) ne repart pas — relancez-le par un
 préréglage dans l'action suivante de la scène. Gladys ne transmet pas le
 volume de l'action à l'intégration.
+
+## Lecteur Musique de Gladys 5.3
+
+Depuis Gladys 5.3, la boîte **Musique** du tableau de bord est un vrai
+lecteur. Pour chaque lecteur LinkPlay, elle montre :
+
+- la **pochette** (WiiM et micrologiciels récents qui la donnent ; une grande
+  pochette, celle d'AirPlay ou d'un serveur Plex, est réduite par
+  l'intégration à 400 pixels), le titre, l'artiste et l'album ;
+- une **barre de progression** qu'on fait glisser pour se déplacer dans le
+  morceau (pas sur une radio ni une entrée, qui n'ont pas de durée) ;
+- lecture, pause, arrêt, précédent, suivant, **aléatoire**, **répétition**
+  (désactivée, tout, un morceau), **sourdine** et volume ;
+- le bouton de navigation ouvre les **préréglages** du lecteur (nommés sur un
+  WiiM, numérotés ailleurs) : un appui en joue un. L'action de scène **Lancer
+  une musique sur une enceinte** les propose aussi.
+
+Aléatoire et répétition suivent la source en cours : Spotify Connect, AirPlay
+ou Tidal Connect peuvent garder leurs propres réglages, et Gladys le dit
+alors. Les micrologiciels n'écrivent pas tous ces modes avec les mêmes valeurs :
+l'intégration vérifie la réponse du lecteur et retient celle qui marche.
+
+**Un lecteur ajouté avant la version 1.1.0** continue de marcher comme avant :
+ouvrez l'onglet **Découverte** de l'intégration et cliquez sur **Mettre à
+jour** sur le lecteur. Pochette, durée, position, aléatoire et répétition
+s'ajoutent ; Titre, Artiste, Album et Sourdine deviennent des fonctionnalités
+musique sous les mêmes identifiants (scènes et tableaux de bord gardés).
+**État de lecture** change : il vaut 2 (et non plus 0) quand le lecteur est
+arrêté, et il n'est plus gardé dans l'historique (Gladys ne garde pas
+d'historique des fonctionnalités musique).
 
 ## Widget
 
@@ -173,8 +203,8 @@ redémarrage de la box est retrouvée toute seule).
   lecteur est accepté), puis HTTP (port 80).
 - **Une source manque dans la liste** : le lecteur ne la déclare pas ;
   donnez-nous son modèle.
-- **Les titres affichent « — »** : la source ne donne pas de titre (une
-  entrée, certains services).
+- **Les titres sont vides** : la source ne donne pas de titre (une entrée,
+  certains services).
 - **Plus de détails** : passez la variable `LOG_LEVEL` à `debug` sur
   l'intégration ; les journaux ne montrent jamais l'adresse d'une annonce en
   entier.
@@ -188,8 +218,9 @@ redémarrage de la box est retrouvée toute seule).
   un certificat client ne sont pas encore pris en charge.
 - Les noms des préréglages ne viennent que des WiiM ; ailleurs, les
   préréglages sont numérotés.
-- Ni avance rapide, ni aléatoire, ni répétition, ni navigation dans une
-  bibliothèque musicale : l'intégration DLNA le fait.
+- Pas de recherche, de file d'attente ni de bibliothèque musicale (l'API
+  LinkPlay n'en a pas) : l'intégration DLNA le fait. Pas de pochette hors des
+  firmwares qui connaissent `getMetaInfo` (WiiM, certains récents).
 - Un lecteur qui suit un groupe n'affiche pas de titre ; le volume d'un
   groupe entier n'est pas géré (chaque lecteur garde le sien).
 - L'état de l'égaliseur est inconnu quand il est changé depuis l'application

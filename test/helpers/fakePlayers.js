@@ -47,8 +47,17 @@ export class FakePlayer {
    * @param {boolean} [options.https] answers on HTTPS 443 (else HTTP 80 only)
    * @param {boolean} [options.prompt] knows playPromptUrl
    * @param {object} [options.status] getStatusEx overrides
+   * @param {'reported' | 'legacy' | 'source'} [options.loopTable] see loopMode()
+   * @param {number} [options.loopDelay] status reads before a loop mode shows
    */
-  constructor(folder, { https = true, prompt = true, status = {} } = {}) {
+  constructor(
+    folder,
+    { https = true, prompt = true, status = {}, loopTable = 'reported', loopDelay = 0 } = {},
+  ) {
+    this.loopTable = loopTable;
+    this.loopDelay = loopDelay;
+    this.pendingLoop = null;
+    this.metaFails = false;
     this.answers = loadFixtures(folder);
     this.statusEx = { ...this.answers.getStatusEx, ...status };
     this.hasEx = this.answers.getPlayerStatusEx !== undefined;
@@ -86,10 +95,16 @@ export class FakePlayer {
       case 'getStatusEx':
         return this.json(this.statusEx);
       case 'getPlayerStatusEx':
+        this.applyPendingLoop();
         return this.hasEx ? this.json(this.player) : 'unknown command';
       case 'getPlayerStatus':
+        this.applyPendingLoop();
         return this.json(this.player);
       case 'getMetaInfo':
+        if (this.metaFails) {
+          return 'Failed';
+        }
+      // falls through
       case 'EQGetList':
       case 'EQGetStat':
       case 'getPresetInfo':
@@ -118,6 +133,37 @@ export class FakePlayer {
     }
   }
 
+  /**
+   * `loopmode:<n>` as the firmware of this fake writes it: `reported` takes
+   * the values it reports (0 to 5), `legacy` the older WiiM table (-1 all,
+   * 0 off, 1 one, 2 shuffle + all), `source` answers OK and changes nothing
+   * (a Spotify Connect session keeps its own modes).
+   */
+  loopMode(mode) {
+    if (this.loopTable === 'reported' && mode >= 0 && mode <= 5) {
+      this.pendingLoop = { loop: String(mode), reads: this.loopDelay };
+      this.applyPendingLoop(0);
+    }
+    if (this.loopTable === 'legacy') {
+      const reads = { '-1': '0', 0: '4', 1: '1', 2: '2' }[mode];
+      if (reads !== undefined) {
+        this.set({ loop: reads });
+      }
+    }
+    return 'OK';
+  }
+
+  /** A slow firmware (`loopDelay`): the loop mode shows after that many reads. */
+  applyPendingLoop(step = 1) {
+    if (this.pendingLoop) {
+      this.pendingLoop.reads -= step;
+      if (this.pendingLoop.reads <= 0) {
+        this.set({ loop: this.pendingLoop.loop });
+        this.pendingLoop = null;
+      }
+    }
+  }
+
   playerCommand([action, ...args]) {
     const value = args.join(':');
     switch (action) {
@@ -139,6 +185,11 @@ export class FakePlayer {
       case 'mute':
         this.set({ mute: value });
         return 'OK';
+      case 'seek':
+        this.set({ curpos: String(Number(value) * 1000) });
+        return 'OK';
+      case 'loopmode':
+        return this.loopMode(Number(value));
       case 'switchmode':
         if (!MODE_OF[value]) {
           return 'Failed';

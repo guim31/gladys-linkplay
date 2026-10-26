@@ -5,19 +5,30 @@
 // No Gladys here: src/hub.js decides when to read and what to publish.
 // -----------------------------------------------------------------------------
 
+import { createHash } from 'node:crypto';
 import { LinkPlayClient } from './linkplay/client.js';
 import { LinkPlayError } from './linkplay/http.js';
 import {
   INPUTS,
   PLAYBACK,
+  decodeLoop,
+  loopModesFor,
   parseDeviceStatus,
   parseEqualizerList,
   parseFollowers,
   parseMetaInfo,
   parsePlayerStatus,
+  parsePresetExtras,
   parsePresetInfo,
 } from './linkplay/status.js';
 import { EQUALIZER_OFF } from './devices.js';
+
+// A player applies a loop mode within a few hundred milliseconds: read back
+// up to LOOP_CHECKS times before deciding it ignored the value.
+export const LOOP_CHECK_MS = 250;
+const LOOP_CHECKS = 3;
+// What the older WiiM write table (`loopmode`) reads back as `loop`.
+const LEGACY_READS = { '-1': '0', 0: '4', 1: '1', 2: '2' };
 
 /** An http(s) URL a player can fetch, else null. */
 export function playableUrl(value) {
@@ -99,6 +110,7 @@ export class Player {
       address: this.address,
       equalizers: previous?.equalizers ?? [],
       presetNames: previous?.presetNames ?? new Map(),
+      presetExtras: previous?.presetExtras ?? new Map(),
     };
     if (extras && info.wiim) {
       // Best effort: a player that misses these is still a player.
@@ -113,9 +125,12 @@ export class Player {
     if (equalizers) {
       this.info.equalizers = equalizers;
     }
-    const presets = await this.optional('getPresetInfo', parsePresetInfo);
+    const presets = await this.optional('getPresetInfo', (raw) => [
+      parsePresetInfo(raw),
+      parsePresetExtras(raw),
+    ]);
     if (presets) {
-      this.info.presetNames = presets;
+      [this.info.presetNames, this.info.presetExtras] = presets;
     }
   }
 
@@ -155,10 +170,27 @@ export class Player {
       raw = await this.client.json(this.playerCommand);
     }
     const status = parsePlayerStatus(raw);
-    const active = status.playback === PLAYBACK.PLAYING || status.playback === PLAYBACK.LOADING;
-    if (active && status.input === 'wifi' && !status.title && this.info?.wiim) {
-      const meta = await this.optional('getMetaInfo', parseMetaInfo).catch(() => null);
-      if (meta) {
+    // getMetaInfo: the artwork (the only place the HTTP API gives it), and the
+    // titles of a web radio or a Bluetooth phone, which the player status
+    // leaves out. WiiM firmwares and some others (a Muzo Mini on 4.6,
+    // home-assistant/core#187893) know it; a firmware that does not is not
+    // asked again, and gives no artwork (only over UPnP, not read here).
+    const reported = [status.source, status.title, status.artist, status.album].join('|');
+    let meta = null;
+    if (status.playback !== PLAYBACK.STOPPED && !status.follower) {
+      meta = await this.optional('getMetaInfo', parseMetaInfo).catch(() => null);
+    }
+    const previous = this.snapshot;
+    if (!meta && previous?.reported === reported) {
+      // Not asked (stopped) or failed this time, same track as before: keep
+      // what getMetaInfo said, rather than blink the titles and artwork.
+      meta = previous.meta;
+    }
+    status.reported = reported;
+    status.meta = meta;
+    if (meta) {
+      status.artworkUrl = this.trackArtwork(meta);
+      if (!status.title) {
         status.title = meta.title;
         status.artist ||= meta.artist;
         status.album ||= meta.album;
@@ -188,6 +220,28 @@ export class Player {
     }
     this.snapshot = { ...status, followers: this.followers, equalizer: this.equalizer };
     return this.snapshot;
+  }
+
+  /**
+   * The artwork URL of a getMetaInfo answer. A cover served by the player
+   * itself (AirPlay: always /data/AirplayArtWorkData.jpeg) keeps its URL from
+   * one track to the next: a fragment naming the track (never sent) makes its
+   * artwork key change with the track, as Gladys caches an image by key.
+   */
+  trackArtwork(meta) {
+    if (!meta.artworkUrl) {
+      return null;
+    }
+    const url = new URL(meta.artworkUrl);
+    if (url.hostname !== this.client.hostname && url.hostname !== this.ip) {
+      return meta.artworkUrl;
+    }
+    const track = createHash('sha1')
+      .update([meta.title, meta.artist, meta.album].join('|'))
+      .digest('hex')
+      .slice(0, 12);
+    url.hash = `track-${track}`;
+    return url.href;
   }
 
   // --- Orders ---------------------------------------------------------------
@@ -227,12 +281,85 @@ export class Player {
   }
 
   /** Mute when not muted, unmute otherwise. */
-  async toggleMute() {
-    const mute = this.snapshot?.muted ? 0 : 1;
-    await this.client.ok(`setPlayerCmd:mute:${mute}`);
+  toggleMute() {
+    return this.setMute(!this.snapshot?.muted);
+  }
+
+  /** @param {boolean} muted */
+  async setMute(muted) {
+    await this.client.ok(`setPlayerCmd:mute:${muted ? 1 : 0}`);
     if (this.snapshot) {
-      this.snapshot.muted = mute === 1;
+      this.snapshot.muted = muted;
     }
+  }
+
+  /** @param {number} position seconds, within the current track */
+  seek(position) {
+    return this.client.ok(`setPlayerCmd:seek:${position}`);
+  }
+
+  /**
+   * Shuffle and repeat, through `loopmode`. Firmwares read `loop` alike but
+   * do not write it alike (see loopModesFor): each value is checked by
+   * reading the status back (a few times: a player may take a moment), the
+   * write table it reveals is kept, and a value the player took with another
+   * meaning is undone.
+   * @param {boolean} shuffle
+   * @param {number} repeat REPEAT value
+   * @param {(ms: number) => Promise<void>} wait
+   * @returns {Promise<boolean>} whether the player reports the combination
+   */
+  async setLoop(shuffle, repeat, wait) {
+    const read = async () => parsePlayerStatus(await this.client.json(this.playerCommand));
+    const decode = (status) =>
+      decodeLoop(status.loop, { wiim: this.info?.wiim, source: status.source });
+    const first = await read();
+    const original = decode(first);
+    let current = first.loop;
+    let candidates = loopModesFor(shuffle, repeat);
+    if (this.loopTable === 'legacy') {
+      candidates = [...candidates].reverse();
+    }
+    for (const mode of candidates) {
+      await this.client.ok(`setPlayerCmd:loopmode:${mode}`);
+      let status = null;
+      for (let check = 0; check < LOOP_CHECKS; check += 1) {
+        await wait(LOOP_CHECK_MS);
+        status = await read();
+        if (status.loop !== current) {
+          break;
+        }
+      }
+      const loop = decode(status);
+      if (loop?.shuffle === shuffle && loop?.repeat === repeat) {
+        this.loopTable =
+          LEGACY_READS[mode] === status.loop && String(mode) !== status.loop
+            ? 'legacy'
+            : 'reported';
+        if (this.snapshot) {
+          this.snapshot.loop = status.loop;
+        }
+        return true;
+      }
+      if (status.loop === current) {
+        continue; // ignored: try the other table
+      }
+      if (LEGACY_READS[mode] === status.loop) {
+        // The older WiiM table took it: its own value comes next.
+        this.loopTable = 'legacy';
+        current = status.loop;
+        continue;
+      }
+      break;
+    }
+    // Not reached: put back what the player had, if it moved.
+    const now = await read();
+    if (original && now.loop !== first.loop) {
+      const back = loopModesFor(original.shuffle, original.repeat);
+      const mode = this.loopTable === 'legacy' ? back.at(-1) : back[0];
+      await this.client.ok(`setPlayerCmd:loopmode:${mode}`).catch(() => {});
+    }
+    return false;
   }
 
   /** @param {string} input a key of INPUTS this player has */

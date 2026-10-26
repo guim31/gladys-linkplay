@@ -36,9 +36,15 @@ test('every control feature sends its LinkPlay command', async () => {
     assert.deepEqual(ack, { success: true }, `${key}: ${ack.error}`);
     assert.equal(salon.orders.at(-1), expected, key);
   }
-  // Mute toggles: muted now, so the next press unmutes.
-  await env.hub.pollPlayer(env.hub.players.get(salon.statusEx.uuid));
+  // music/mute (1.1.0) is explicit: 0 unmutes, 1 mutes again.
+  await command(env, SALON, 'mute', 0);
+  assert.equal(salon.orders.at(-1), 'setPlayerCmd:mute:0');
   await command(env, SALON, 'mute', 1);
+  assert.equal(salon.orders.at(-1), 'setPlayerCmd:mute:1');
+  // The 1.0 television push button (device not updated yet) still toggles.
+  await env.hub.pollPlayer(env.hub.players.get(salon.statusEx.uuid));
+  const pushButton = { external_id: env.idOf(SALON, 'mute'), category: 'television' };
+  await env.gladys.fake.setValue(env.deviceOf(SALON), pushButton, 1);
   assert.equal(salon.orders.at(-1), 'setPlayerCmd:mute:0');
 });
 

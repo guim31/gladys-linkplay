@@ -8,6 +8,7 @@ import { createLogger } from '@gladysassistant/integration-sdk';
 import { ACTIONS } from './actions.js';
 import { uuidOf } from './devices.js';
 import { LinkPlayHub, WIDGET_KEY } from './hub.js';
+import { createArtworkHandler } from './music.js';
 import { SCENE_ACTIONS } from './scenes.js';
 import { WIDGETS } from './widgets.js';
 
@@ -15,7 +16,8 @@ const logger = createLogger({ name: 'linkplay-app' });
 
 /**
  * @param {object} gladys GladysIntegration instance
- * @param {object} [options] test seams: get (HTTP transport), timers, timings, now
+ * @param {object} [options] test seams: get (HTTP transport), artworkGet (artwork
+ *   transport), timers, timings, now, wait
  */
 export function registerHandlers(gladys, options = {}) {
   const hub = new LinkPlayHub({
@@ -24,6 +26,7 @@ export function registerHandlers(gladys, options = {}) {
     timers: options.timers ?? true,
     timings: options.timings,
     now: options.now,
+    wait: options.wait,
   });
 
   gladys.on('connected', async () => {
@@ -50,6 +53,17 @@ export function registerHandlers(gladys, options = {}) {
   gladys.onPoll((device) => hub.pollFromCore(device));
 
   gladys.onSetValue((device, feature, value) => hub.setValue(device, feature, value));
+
+  // Gladys 5.3 music panel: the presets, and the artwork of what plays.
+  gladys.onMusicBrowse((device, request) => hub.browse(device, request));
+  gladys.onMusicPlay((device, media) => hub.playMedia(device, media));
+  // A cover on a player itself (AirPlay) is in self-signed HTTPS, like its API.
+  gladys.onMusicGetArtwork(
+    createArtworkHandler(gladys, {
+      get: options.artworkGet,
+      trusted: (host) => hub.isPlayerHost(host),
+    }),
+  );
 
   // A player just added: Gladys dropped the states sent before it existed,
   // and the SDK forgot them. Everything is sent again now.

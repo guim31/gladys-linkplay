@@ -93,6 +93,10 @@ test('the playback reads the status, the source and the titles', () => {
     title: '',
     artist: '',
     album: '',
+    duration: 0,
+    position: 0,
+    loop: '0',
+    artworkUrl: null,
   });
   const follower = parsePlayerStatus(
     loadFixtures('artsound-smart-zone-4')['getPlayerStatusEx-follower'],
@@ -142,6 +146,7 @@ test('groups, metadata, presets and equalizers of a WiiM are read', () => {
     title: 'Clair de lune',
     artist: 'Claude Debussy',
     album: 'FIP',
+    artworkUrl: 'https://example.invalid/cover.jpg',
   });
   assert.deepEqual(
     [...parsePresetInfo(wiim.getPresetInfo)],

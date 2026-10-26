@@ -28,6 +28,11 @@ export const NAMES = {
     source: 'Source',
     equalizer: 'Equalizer',
     group: 'Multiroom group',
+    artwork: 'Artwork',
+    duration: 'Duration',
+    position: 'Position',
+    shuffle: 'Shuffle',
+    repeat: 'Repeat',
     notification: 'Notification',
   },
   fr: {
@@ -45,6 +50,11 @@ export const NAMES = {
     source: 'Source',
     equalizer: 'Égaliseur',
     group: 'Groupe multiroom',
+    artwork: 'Pochette',
+    duration: 'Durée',
+    position: 'Position',
+    shuffle: 'Aléatoire',
+    repeat: 'Répétition',
     notification: 'Notification',
   },
   de: {
@@ -62,6 +72,11 @@ export const NAMES = {
     source: 'Quelle',
     equalizer: 'Equalizer',
     group: 'Multiroom-Gruppe',
+    artwork: 'Cover',
+    duration: 'Dauer',
+    position: 'Position',
+    shuffle: 'Zufallswiedergabe',
+    repeat: 'Wiederholen',
     notification: 'Benachrichtigung',
   },
   es: {
@@ -79,6 +94,11 @@ export const NAMES = {
     source: 'Fuente',
     equalizer: 'Ecualizador',
     group: 'Grupo multiroom',
+    artwork: 'Carátula',
+    duration: 'Duración',
+    position: 'Posición',
+    shuffle: 'Aleatorio',
+    repeat: 'Repetir',
     notification: 'Notificación',
   },
 };
@@ -310,6 +330,9 @@ export const ERRORS = {
     invalidVolume: 'The volume goes from 0 to 100.',
     sameDevice: 'A player cannot join its own group.',
     noLeaderAddress: (name) => `The address of ${name} is unknown.`,
+    notSeekable: (name) => `What ${name} plays has no position to move to (a radio, a live input).`,
+    invalidValue: 'This value is not accepted here.',
+    loopRefused: (name) => `${name} kept its shuffle and repeat: the source in use decides them.`,
     updateGladys: 'This button needs Gladys 5.2.0 or later.',
   },
   fr: {
@@ -324,6 +347,11 @@ export const ERRORS = {
     invalidVolume: 'Le volume va de 0 à 100.',
     sameDevice: 'Un lecteur ne peut pas rejoindre son propre groupe.',
     noLeaderAddress: (name) => `L'adresse de ${name} est inconnue.`,
+    notSeekable: (name) =>
+      `Ce que joue ${name} n'a pas de position où aller (une radio, une entrée en direct).`,
+    invalidValue: "Cette valeur n'est pas acceptée ici.",
+    loopRefused: (name) =>
+      `${name} a gardé son aléatoire et sa répétition : c'est la source en cours qui les décide.`,
     updateGladys: 'Ce bouton demande Gladys 5.2.0 ou plus récent.',
   },
   de: {
@@ -339,6 +367,11 @@ export const ERRORS = {
     invalidVolume: 'Die Lautstärke geht von 0 bis 100.',
     sameDevice: 'Ein Player kann nicht seiner eigenen Gruppe beitreten.',
     noLeaderAddress: (name) => `Die Adresse von ${name} ist unbekannt.`,
+    notSeekable: (name) =>
+      `Was ${name} spielt, hat keine Position zum Springen (ein Radio, ein Live-Eingang).`,
+    invalidValue: 'Dieser Wert wird hier nicht akzeptiert.',
+    loopRefused: (name) =>
+      `${name} hat Zufall und Wiederholung behalten: Die aktive Quelle entscheidet darüber.`,
     updateGladys: 'Diese Schaltfläche braucht Gladys 5.2.0 oder neuer.',
   },
   es: {
@@ -354,6 +387,11 @@ export const ERRORS = {
     invalidVolume: 'El volumen va de 0 a 100.',
     sameDevice: 'Un reproductor no puede unirse a su propio grupo.',
     noLeaderAddress: (name) => `La dirección de ${name} es desconocida.`,
+    notSeekable: (name) =>
+      `Lo que reproduce ${name} no tiene posición a la que ir (una radio, una entrada en directo).`,
+    invalidValue: 'Este valor no se acepta aquí.',
+    loopRefused: (name) =>
+      `${name} ha mantenido el aleatorio y la repetición: los decide la fuente en uso.`,
     updateGladys: 'Este botón requiere Gladys 5.2.0 o posterior.',
   },
 };

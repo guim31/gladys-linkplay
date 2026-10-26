@@ -68,15 +68,15 @@ Jeder Player ist ein Gladys-Gerät, benannt wie in seiner App.
 
 ### Wiedergabe und Lautstärke
 
-| Funktion                    | Typ                      | Was sie tut                                                 |
-| --------------------------- | ------------------------ | ----------------------------------------------------------- |
-| Wiedergabe                  | music / play             | Setzt die Wiedergabe fort                                   |
-| Pause                       | music / pause            | Pausiert                                                    |
-| Stopp                       | television / stop        | Stoppt (eine Schaltfläche in der Raumkarte)                 |
-| Vorheriger / Nächster Titel | music / previous, next   | Vorheriger oder nächster Titel                              |
-| Lautstärke                  | music / volume (0-100)   | Liest und setzt die Lautstärke                              |
-| Stumm                       | television / volume-mute | Schaltet stumm, oder wieder laut, wenn stumm (Schaltfläche) |
-| Wiedergabestatus            | music / playback_state   | 1 während der Wiedergabe, sonst 0 (im Verlauf gespeichert)  |
+| Funktion                    | Typ                    | Was sie tut                                                                       |
+| --------------------------- | ---------------------- | --------------------------------------------------------------------------------- |
+| Wiedergabe                  | music / play           | Setzt die Wiedergabe fort                                                         |
+| Pause                       | music / pause          | Pausiert                                                                          |
+| Stopp                       | television / stop      | Stoppt (eine Schaltfläche in der Raumkarte)                                       |
+| Vorheriger / Nächster Titel | music / previous, next | Vorheriger oder nächster Titel                                                    |
+| Lautstärke                  | music / volume (0-100) | Liest und setzt die Lautstärke                                                    |
+| Stumm                       | music / mute           | Schaltet stumm oder wieder laut (vor „Aktualisieren“ ein Umschalter, siehe unten) |
+| Wiedergabestatus            | music / playback_state | 1 Wiedergabe, 0 Pause, 2 gestoppt, 3 lädt; schreibbar (0, 1, 2)                   |
 
 Das Musik-Widget des Gladys-Dashboards nutzt diese Funktionen.
 
@@ -93,8 +93,8 @@ Das Musik-Widget des Gladys-Dashboards nutzt diese Funktionen.
 
 ### Titel und Gruppe
 
-- **Titel**, **Interpret**, **Album**: was gerade läuft; „—“, wenn die Quelle
-  nichts liefert (ein Eingang, ein Player, der einer Gruppe folgt).
+- **Titel**, **Interpret**, **Album**: was gerade läuft; leer, wenn die
+  Quelle nichts liefert (ein Eingang, ein Player, der einer Gruppe folgt).
 - **Multiroom-Gruppe**: „Nicht gruppiert“, „Führt: Küche, Schlafzimmer“ oder
   „Folgt: Wohnzimmer“.
 
@@ -107,6 +107,38 @@ Musik: Lief ein Eingang (TV, Line-In...), schaltet der Player danach zurück;
 ein Netzwerk-Stream (Spotify, ein Webradio) startet nicht neu — starte ihn mit
 einer Voreinstellung in der nächsten Aktion der Szene. Gladys gibt die
 Lautstärke der Aktion nicht an die Integration weiter.
+
+## Musik-Player von Gladys 5.3
+
+Seit Gladys 5.3 ist die **Musik**-Box des Dashboards ein echter Player. Für
+jeden LinkPlay-Player zeigt sie:
+
+- das **Cover** (WiiM und neuere Firmwares, die es liefern; ein großes, von
+  AirPlay oder einem Plex-Server, verkleinert die Integration auf 400 Pixel),
+  Titel, Interpret und Album;
+- einen **Fortschrittsbalken**, den du ziehst, um im Titel zu springen (nicht
+  bei einem Radio oder einem Eingang, die keine Länge haben);
+- Wiedergabe, Pause, Stopp, zurück, weiter, **Zufallswiedergabe**,
+  **Wiederholung** (aus, alle, ein Titel), **Stumm** und Lautstärke;
+- die Navigationsschaltfläche öffnet die **Voreinstellungen** des Players
+  (auf einem WiiM mit Namen, sonst nummeriert): Ein Tippen spielt eine ab.
+  Die Szenenaktion **Musik auf einem Lautsprecher abspielen** bietet sie
+  ebenfalls an.
+
+Zufallswiedergabe und Wiederholung folgen der aktiven Quelle: Spotify
+Connect, AirPlay oder Tidal Connect können ihre eigenen Einstellungen
+behalten, und Gladys sagt es dann. Nicht alle Firmwares schreiben diese Modi
+mit denselben Werten: Die Integration prüft die Antwort des Players und merkt
+sich den Wert, der funktioniert.
+
+**Ein Player, der vor Version 1.1.0 hinzugefügt wurde**, funktioniert weiter
+wie bisher: Öffne den Tab **Entdecken** der Integration und klicke beim Player
+auf **Aktualisieren**. Cover, Dauer, Position, Zufallswiedergabe und
+Wiederholung kommen hinzu; Titel, Interpret, Album und Stumm werden
+Musik-Funktionen unter denselben IDs (Szenen und Dashboards bleiben).
+**Wiedergabestatus** ändert sich: Er ist 2 (nicht mehr 0), wenn der Player
+gestoppt ist, und wird nicht mehr im Verlauf gespeichert (Gladys speichert
+keinen Verlauf von Musik-Funktionen).
 
 ## Widget
 
@@ -174,7 +206,7 @@ sie nie als veraltet zeigt). Das Netzwerk wird beim Start durchsucht, mit
   Zertifikat des Players wird akzeptiert), dann HTTP (Port 80).
 - **Eine Quelle fehlt in der Liste**: Der Player meldet sie nicht; nenn uns
   sein Modell.
-- **Die Titel zeigen „—“**: Die Quelle liefert keine Titel (ein Eingang,
+- **Die Titel sind leer**: Die Quelle liefert keine Titel (ein Eingang,
   manche Dienste).
 - **Mehr Details**: Setze die Variable `LOG_LEVEL` der Integration auf
   `debug`; die Protokolle zeigen die Adresse einer Durchsage nie vollständig.
@@ -188,8 +220,9 @@ sie nie als veraltet zeigt). Das Netzwerk wird beim Start durchsucht, mit
   Client-Zertifikat antworten, werden noch nicht unterstützt.
 - Namen der Voreinstellungen gibt es nur von WiiM-Playern; sonst sind sie
   nummeriert.
-- Kein Spulen, keine Zufallswiedergabe, keine Wiederholung, kein Durchsuchen
-  einer Musikbibliothek: Das macht die DLNA-Integration.
+- Keine Suche, keine Warteschlange, keine Musikbibliothek (die LinkPlay-API
+  hat sie nicht): Das macht die DLNA-Integration. Kein Cover auf Firmwares
+  ohne `getMetaInfo` (WiiM und manche neuere haben es).
 - Ein Player, der einer Gruppe folgt, zeigt keine Titel; die Lautstärke einer
   ganzen Gruppe wird nicht verwaltet (jeder Player behält seine eigene).
 - Der Zustand des Equalizers ist unbekannt, wenn er in der App WiiM Home

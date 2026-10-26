@@ -75,16 +75,16 @@ test('the states of the added players are published, titles decoded', async () =
   assert.equal(last(SALON, 'source'), 'wifi');
   assert.equal(last(SALON, 'equalizer'), 'off');
   assert.equal(last(SALON, 'group'), 'Maître de : Cuisine');
-  // WiiM Amp following it: no source, empty titles as a dash.
+  // WiiM Amp following it: no source, titles explicitly empty (music/title).
   assert.equal(last(CUISINE, 'group'), 'Suit : Salon');
   assert.equal(last(CUISINE, 'source'), undefined);
-  assert.equal(last(CUISINE, 'title'), '—');
+  assert.equal(last(CUISINE, 'title'), '');
   // Arylic on an older firmware: getPlayerStatus, hex titles, line in.
   assert.equal(last(BUREAU, 'title'), 'Line In');
   assert.equal(last(BUREAU, 'source'), 'line-in');
   assert.equal(last(BUREAU, 'group'), 'Non groupé');
-  // ArtSound (real answers): stopped, volume 80.
-  assert.equal(last(ZONE, 'playback-state'), 0);
+  // ArtSound (real answers): stopped (IDLE since 1.1.0, 0 is a pause), volume 80.
+  assert.equal(last(ZONE, 'playback-state'), 2);
   assert.equal(last(ZONE, 'volume'), 80);
   // No equalizer feature on a non-WiiM player: no state either.
   assert.equal(last(BUREAU, 'equalizer'), undefined);
