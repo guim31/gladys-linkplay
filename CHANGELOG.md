@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-26
+
 ### Added
 
 - Gladys 5.3 music player: the Music box of the dashboard shows the artwork
@@ -58,5 +60,6 @@ the notes of the version's GitHub Release.
 - Feature names, sources and messages in English, French, German and
   Spanish; documentation in the four languages.
 
-[Unreleased]: https://github.com/guim31/gladys-linkplay/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/guim31/gladys-linkplay/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/guim31/gladys-linkplay/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/guim31/gladys-linkplay/releases/tag/v1.0.1
